@@ -6,15 +6,15 @@ plugins {
 android {
     namespace = "com.example.logist_tech"
     compileSdk {
-        version = release(36) {
+        version = release(35) {
             minorApiLevel = 1
         }
     }
 
     defaultConfig {
         applicationId = "com.example.logist_tech"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
