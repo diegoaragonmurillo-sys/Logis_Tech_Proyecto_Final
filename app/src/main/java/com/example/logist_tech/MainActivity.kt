@@ -8,50 +8,88 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.navigation.compose.NavHost
+import androidx.compose.navigation.compose.composable
+import androidx.compose.navigation.compose.rememberNavController
 import com.example.logist_tech.anomalias.AnomaliasScreen
 import com.example.logist_tech.history.HistoryScreen
 import com.example.logist_tech.inventory.InventarioScreen
-import com.example.logist_tech.scanner.CameraScreen
+import com.example.logist_tech.scanner.ScannerScreen
 import com.example.logist_tech.ui.screens.HomeScreen
 import com.example.logist_tech.ui.theme.Logist_TechTheme
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
+
         setContent {
+
             Logist_TechTheme {
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+
                     val navController = rememberNavController()
+
                     NavHost(
                         navController = navController,
                         startDestination = "home"
                     ) {
+
                         composable("home") {
+
                             HomeScreen(
-                                onNavigateScanner = { navController.navigate("scanner") },
-                                onNavigateInventory = { navController.navigate("inventory") },
-                                onNavigateHistory = { navController.navigate("history") },
-                                onNavigateAnomalies = { navController.navigate("anomalies") }
+                                onNavigateScanner = {
+                                    navController.navigate("scanner")
+                                },
+                                onNavigateInventory = {
+                                    navController.navigate("inventory")
+                                },
+                                onNavigateHistory = {
+                                    navController.navigate("history")
+                                },
+                                onNavigateAnomalias = {
+                                    navController.navigate("anomalias")
+                                }
                             )
                         }
+
                         composable("scanner") {
-                            CameraScreen(onNavigateBack = { navController.popBackStack() })
+
+                            ScannerScreen()
+
                         }
+
                         composable("inventory") {
-                            InventarioScreen(onNavigateBack = { navController.popBackStack() })
+
+                            InventarioScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
+                            )
                         }
+
                         composable("history") {
-                            HistoryScreen(onNavigateBack = { navController.popBackStack() })
+
+                            HistoryScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
+                            )
                         }
-                        composable("anomalies") {
-                            AnomaliasScreen(onNavigateBack = { navController.popBackStack() })
+
+                        composable("anomalias") {
+
+                            AnomaliasScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
+                            )
                         }
                     }
                 }
