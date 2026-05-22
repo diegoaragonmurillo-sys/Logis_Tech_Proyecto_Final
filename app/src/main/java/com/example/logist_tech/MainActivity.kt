@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.logist_tech.inventory.InventarioScreen
 import com.example.logist_tech.history.HistoryScreen
+import com.example.logist_tech.inventory.InventarioScreen
+import com.example.logist_tech.scanner.CameraScreen
 import com.example.logist_tech.ui.theme.Logist_TechTheme
 
 class MainActivity : ComponentActivity() {
