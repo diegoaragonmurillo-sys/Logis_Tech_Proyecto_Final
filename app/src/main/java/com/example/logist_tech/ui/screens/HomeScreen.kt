@@ -7,11 +7,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,7 +44,7 @@ fun HomeScreen(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(id = R.drawable.ic_logo_logistech),
+                painter = painterResource(id = R.drawable.ic_logo_logis),
                 contentDescription = "LogisTech Logo",
                 modifier = Modifier.size(320.dp)
             )
@@ -55,28 +61,28 @@ fun HomeScreen(
             item {
                 MenuCard(
                     title = "Escáner IA",
-                    iconRes = R.drawable.ic_scanner,
+                    icon = Icons.Filled.CameraAlt,
                     onClick = onNavigateScanner
                 )
             }
             item {
                 MenuCard(
                     title = "Inventario",
-                    iconRes = R.drawable.ic_inventory,
+                    icon = Icons.Filled.Inventory,
                     onClick = onNavigateInventory
                 )
             }
             item {
                 MenuCard(
                     title = "Historial",
-                    iconRes = R.drawable.ic_history,
+                    icon = Icons.Filled.History,
                     onClick = onNavigateHistory
                 )
             }
             item {
                 MenuCard(
                     title = "Anomalías",
-                    iconRes = R.drawable.ic_anomalies,
+                    icon = Icons.Filled.Warning,
                     onClick = onNavigateAnomalies
                 )
             }
@@ -87,7 +93,7 @@ fun HomeScreen(
 @Composable
 fun MenuCard(
     title: String,
-    iconRes: Int,
+    icon: ImageVector,
     onClick: () -> Unit
 ) {
     Card(
@@ -106,9 +112,10 @@ fun MenuCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(id = iconRes),
+            Icon(
+                imageVector = icon,
                 contentDescription = null,
+                tint = Color.White,
                 modifier = Modifier.size(64.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
