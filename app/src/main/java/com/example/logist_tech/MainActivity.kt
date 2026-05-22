@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.navigation.compose.NavHost
-import androidx.compose.navigation.compose.composable
-import androidx.compose.navigation.compose.rememberNavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.logist_tech.anomalias.AnomaliasScreen
 import com.example.logist_tech.history.HistoryScreen
 import com.example.logist_tech.inventory.InventarioScreen
@@ -53,20 +53,17 @@ class MainActivity : ComponentActivity() {
                                 onNavigateHistory = {
                                     navController.navigate("history")
                                 },
-                                onNavigateAnomalias = {
+                                onNavigateAnomalies = { // <-- CAMBIO AQUÍ: de Anomalias a Anomalies
                                     navController.navigate("anomalias")
                                 }
                             )
                         }
 
                         composable("scanner") {
-
                             ScannerScreen()
-
                         }
 
                         composable("inventory") {
-
                             InventarioScreen(
                                 onNavigateBack = {
                                     navController.popBackStack()
@@ -75,7 +72,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("history") {
-
                             HistoryScreen(
                                 onNavigateBack = {
                                     navController.popBackStack()
@@ -84,7 +80,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("anomalias") {
-
                             AnomaliasScreen(
                                 onNavigateBack = {
                                     navController.popBackStack()
