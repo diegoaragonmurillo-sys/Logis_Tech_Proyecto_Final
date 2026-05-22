@@ -42,16 +42,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("scanner") {
-                            CameraScreen()
+                            CameraScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable("inventory") {
-                            InventarioScreen()
+                            InventarioScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable("history") {
-                            HistoryScreen()
+                            HistoryScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable("anomalies") {
-                            AnomaliasScreen()
+                            AnomaliasScreen(onNavigateBack = { navController.popBackStack() })
                         }
                     }
                 }

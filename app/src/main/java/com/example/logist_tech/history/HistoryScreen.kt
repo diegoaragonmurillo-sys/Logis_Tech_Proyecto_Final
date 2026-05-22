@@ -35,7 +35,7 @@ private val AzulOscuro = Color(0xFF123B6D)
 private val FondoBlanco = Color(0xFFFFFFFF)
 
 @Composable
-fun HistoryScreen() {
+fun HistoryScreen(onNavigateBack: () -> Unit = {}) {
 
     var selectedFilter by remember { mutableStateOf<String?>("Entrada") }
     var searchQuery by remember { mutableStateOf("") }
@@ -75,7 +75,7 @@ fun HistoryScreen() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",

@@ -26,7 +26,7 @@ private val AzulOscuro = Color(0xFF123B6D)
 private val FondoBlanco = Color(0xFFFFFFFF)
 
 @Composable
-fun AnomaliasScreen() {
+fun AnomaliasScreen(onNavigateBack: () -> Unit = {}) {
     var filtroActivo by remember { mutableStateOf<String?>(null) }
     var anomalias by remember { mutableStateOf(AnomaliaManager.filtrarPorPrioridad(null)) }
 
@@ -47,7 +47,7 @@ fun AnomaliasScreen() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
