@@ -9,8 +9,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -168,11 +170,9 @@ fun ProductoItem(
     onEntrada: () -> Unit,
     onSalida: () -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp), // esquinas ovaladas
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = ItemCrema),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -193,9 +193,12 @@ fun ProductoItem(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (bajoBstock) "⚠️" else "📦",
-                    fontSize = 18.sp
+                Icon(
+                    imageVector = if (bajoBstock) Icons.Default.Warning
+                    else Icons.Default.Inventory,
+                    contentDescription = null,
+                    tint = if (bajoBstock) Color(0xFFE53935) else AzulLogis,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -225,28 +228,28 @@ fun ProductoItem(
                 modifier = Modifier.padding(end = 4.dp)
             )
 
-            // Menú ⋮
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "Opciones",
-                        tint = GrisTexto
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("+ Entrada") },
-                        onClick = { onEntrada(); menuExpanded = false }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("- Salida") },
-                        onClick = { onSalida(); menuExpanded = false }
-                    )
-                }
+            // Botones + y -
+            IconButton(
+                onClick = onSalida,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = "Salida",
+                    tint = Color(0xFFE53935),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(
+                onClick = onEntrada,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Entrada",
+                    tint = Color(0xFF2E7D32),
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
