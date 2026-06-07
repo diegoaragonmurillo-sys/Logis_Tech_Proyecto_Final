@@ -160,4 +160,3 @@ fun MenuCard(
 fun HomeScreenPreview() {
     HomeScreen()
 }
-
