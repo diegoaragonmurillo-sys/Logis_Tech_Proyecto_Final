@@ -6,6 +6,7 @@ package com.example.logist_tech.ocr
  * Ejemplo de QR esperado: {"producto":"Laptop","cantidad":10}
  */
 data class QrData(
+    val idCaja: String,
     val nombre: String,
     val cantidad: Int
 )

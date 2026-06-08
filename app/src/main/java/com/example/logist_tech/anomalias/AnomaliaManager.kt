@@ -36,6 +36,8 @@ object AnomaliaManager {
         val anomalia = Anomalia(
             id               = System.currentTimeMillis().toString(),
             fecha            = obtenerFechaActual(),
+            fechaHora        = obtenerFechaHoraActual(),
+            idCaja           = resultado.qrData?.idCaja ?: "",
             tipo             = resultado.tipo,
             descripcion      = resultado.descripcion,
             prioridad        = resultado.prioridad,
@@ -80,4 +82,7 @@ object AnomaliaManager {
 
     private fun obtenerFechaActual(): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+
+    private fun obtenerFechaHoraActual(): String =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 }

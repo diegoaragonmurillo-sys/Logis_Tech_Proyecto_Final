@@ -1,6 +1,7 @@
 package com.example.logist_tech.ocr
 
 import org.json.JSONObject
+import com.example.logist_tech.anomalias.AnomaliaType
 
 /**
  * T-03 — OcrProcessor
@@ -95,14 +96,37 @@ object OcrProcessor {
         if (qrJson.isBlank() || qrJson == "Esperando código QR...") return null
         return try {
             val json     = JSONObject(qrJson)
+            val idCaja   = when {
+                json.has("idCaja") -> json.getString("idCaja")
+                json.has("id") -> json.getString("id")
+                else -> ""
+            }.trim()
             val nombre   = json.optString("producto", "").trim()
             val cantidad = json.optInt("cantidad", 0)
-            if (nombre.isBlank()) null
-            else QrData(nombre = nombre, cantidad = cantidad)
+            
+            // Retorna QrData si es JSON válido para evaluar campos incompletos
+            QrData(idCaja = idCaja, nombre = nombre, cantidad = cantidad)
         } catch (e: Exception) {
-            // El QR no es JSON válido — puede ser un QR de otro formato
+            // El QR no es JSON válido
             null
         }
+    }
+
+    /**
+     * Valida de manera lógica si el identificador de la caja está registrado en la API.
+     * 
+     * NOTA PARA EL ENCARGADO DEL BLOQUE E:
+     * Para conectar con la API real (http://38.250.116.214:80/api/v1/cajas), se debe reemplazar
+     * esta simulación lógica por una llamada de red síncrona/asíncrona (usando Retrofit u okhttp).
+     * Por ahora, se valida lógicamente:
+     *  - Se consideran válidos los IDs que comiencen con "CJ-" (ej. CJ-001, CJ-002, etc.).
+     *  - También se acepta una lista de IDs de prueba predefinidos ("1", "2", "3", "4", "BOX-001", "BOX-002").
+     *  - Cualquier otro ID simula una respuesta HTTP 404 (retornando false).
+     */
+    fun esCajaRegistradaEnApi(idCaja: String): Boolean {
+        if (idCaja.isBlank()) return false
+        val listaPrueba = setOf("1", "2", "3", "4", "BOX-001", "BOX-002")
+        return idCaja.startsWith("CJ-", ignoreCase = true) || idCaja in listaPrueba
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -112,14 +136,6 @@ object OcrProcessor {
     /**
      * Compara los datos extraídos del OCR con los del QR y detecta anomalías.
      * Este resultado se pasa al módulo de Anomalías (T-04).
-     *
-     * Reglas de detección:
-     *  - Texto borroso / vacío                      → ALTA
-     *  - Producto inexistente en OCR                → ALTA
-     *  - Cantidad vacía en OCR                      → MEDIA
-     *  - Nombre QR ≠ nombre OCR                     → ALTA
-     *  - Cantidad QR ≠ cantidad OCR                 → MEDIA
-     *  - Todo coincide                              → SIN_ANOMALIA
      */
     fun compararOcrConQr(ocrData: OcrData, qrData: QrData?): ResultadoComparacion {
 
@@ -127,7 +143,7 @@ object OcrProcessor {
         if (ocrData.textoOriginal.isBlank()) {
             return ResultadoComparacion(
                 hayAnomalia = true,
-                tipo        = "TEXTO_BORROSO",
+                tipo        = AnomaliaType.TEXTO_BORROSO,
                 descripcion = "El OCR no pudo leer el documento. Intente mejorar el enfoque o la iluminación.",
                 prioridad   = "ALTA",
                 ocrData     = ocrData,
@@ -135,11 +151,37 @@ object OcrProcessor {
             )
         }
 
-        // Caso 2: No se detectó nombre de producto en el OCR
+        // Caso 2: Validación de Datos Incompletos
+        // Si el QR está presente y le falta algún campo obligatorio (id/idCaja, producto/nombre, cantidad)
+        val qrIncompleto = qrData != null && (qrData.idCaja.isBlank() || qrData.nombre.isBlank() || qrData.cantidad <= 0)
+        if (qrIncompleto) {
+            return ResultadoComparacion(
+                hayAnomalia = true,
+                tipo        = AnomaliaType.DATOS_INCOMPLETOS,
+                descripcion = "Los datos del código QR están incompletos (requiere ID, producto y cantidad).",
+                prioridad   = "ALTA",
+                ocrData     = ocrData,
+                qrData      = qrData
+            )
+        }
+
+        // Caso 3: Validación de la API (Caja no registrada -> Error 404)
+        if (qrData != null && !esCajaRegistradaEnApi(qrData.idCaja)) {
+            return ResultadoComparacion(
+                hayAnomalia = true,
+                tipo        = AnomaliaType.CAJA_NO_REGISTRADA_EN_API,
+                descripcion = "La caja con ID '${qrData.idCaja}' no está registrada en la API (Error 404).",
+                prioridad   = "ALTA",
+                ocrData     = ocrData,
+                qrData      = qrData
+            )
+        }
+
+        // Caso 4: No se detectó nombre de producto en el OCR (PRODUCTO_INEXISTENTE)
         if (ocrData.nombre.isBlank()) {
             return ResultadoComparacion(
                 hayAnomalia = true,
-                tipo        = "PRODUCTO_INEXISTENTE",
+                tipo        = AnomaliaType.PRODUCTO_INEXISTENTE,
                 descripcion = "No se detectó nombre de producto en el documento OCR.",
                 prioridad   = "ALTA",
                 ocrData     = ocrData,
@@ -147,12 +189,12 @@ object OcrProcessor {
             )
         }
 
-        // Caso 3: No se detectó cantidad en el OCR
-        if (ocrData.cantidad == 0) {
+        // Caso 5: No se detectó cantidad o valor inválido en el OCR (CANTIDAD_ERRONEA)
+        if (ocrData.cantidad <= 0) {
             return ResultadoComparacion(
                 hayAnomalia = true,
-                tipo        = "CANTIDAD_VACIA",
-                descripcion = "No se detectó cantidad en el documento. Verifique el formato del documento.",
+                tipo        = AnomaliaType.CANTIDAD_ERRONEA,
+                descripcion = "No se detectó cantidad o el valor es inválido en el documento OCR.",
                 prioridad   = "MEDIA",
                 ocrData     = ocrData,
                 qrData      = qrData
@@ -163,7 +205,7 @@ object OcrProcessor {
         if (qrData == null) {
             return ResultadoComparacion(
                 hayAnomalia = false,
-                tipo        = "SIN_ANOMALIA",
+                tipo        = AnomaliaType.SIN_ANOMALIA,
                 descripcion = "OCR leído correctamente. Sin QR para comparar.",
                 prioridad   = "BAJA",
                 ocrData     = ocrData,
@@ -171,13 +213,13 @@ object OcrProcessor {
             )
         }
 
-        // Caso 4: El nombre del producto no coincide entre QR y OCR
+        // Caso 6: El nombre del producto no coincide entre QR y OCR (QR_OCR_DIFERENTE)
         val nombreOcrNorm = ocrData.nombre.trim().lowercase()
         val nombreQrNorm  = qrData.nombre.trim().lowercase()
         if (!nombreOcrNorm.contains(nombreQrNorm) && !nombreQrNorm.contains(nombreOcrNorm)) {
             return ResultadoComparacion(
                 hayAnomalia = true,
-                tipo        = "QR_OCR_DIFERENTE",
+                tipo        = AnomaliaType.QR_OCR_DIFERENTE,
                 descripcion = "El producto del QR (\"${qrData.nombre}\") no coincide con el OCR (\"${ocrData.nombre}\").",
                 prioridad   = "ALTA",
                 ocrData     = ocrData,
@@ -185,11 +227,11 @@ object OcrProcessor {
             )
         }
 
-        // Caso 5: La cantidad no coincide entre QR y OCR
+        // Caso 7: La cantidad no coincide entre QR y OCR (CANTIDAD_ERRONEA)
         if (qrData.cantidad != ocrData.cantidad) {
             return ResultadoComparacion(
                 hayAnomalia = true,
-                tipo        = "QR_OCR_DIFERENTE",
+                tipo        = AnomaliaType.CANTIDAD_ERRONEA,
                 descripcion = "Cantidad QR: ${qrData.cantidad}  ≠  Cantidad OCR: ${ocrData.cantidad}.",
                 prioridad   = "MEDIA",
                 ocrData     = ocrData,
@@ -200,7 +242,7 @@ object OcrProcessor {
         // Todo coincide → sin anomalía
         return ResultadoComparacion(
             hayAnomalia = false,
-            tipo        = "SIN_ANOMALIA",
+            tipo        = AnomaliaType.SIN_ANOMALIA,
             descripcion = "✅ QR y OCR coinciden correctamente.",
             prioridad   = "BAJA",
             ocrData     = ocrData,
