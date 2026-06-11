@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.logist_tech.R
 import com.example.logist_tech.models.Producto
+import androidx.compose.runtime.LaunchedEffect
+import com.example.logist_tech.api.RetrofitClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val AzulLogis   = Color(0xFF2980B9)
 private val FondoBlanco = Color(0xFFFFFFFF)
@@ -43,6 +47,23 @@ fun InventarioScreen(
 
     val stockActual    = StockManager.calcularStockTotal(movimientos)
     val productosBajos = StockManager.productosBajoStock(movimientos)
+    var cajasApi by remember {
+        mutableStateOf<List<com.example.logist_tech.api.CajaResponse>>(emptyList())
+    }
+
+    LaunchedEffect(Unit) {
+        try {
+            val response = withContext(Dispatchers.IO) {
+                RetrofitClient.apiService.getCajas()
+            }
+
+            if (response.isSuccessful) {
+                cajasApi = response.body() ?: emptyList()
+            }
+
+        } catch (_: Exception) {
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -91,25 +112,35 @@ fun InventarioScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(stockActual.entries.toList()) { entry ->
-                    val esBajo  = entry.key in productosBajos
-                    val detalle = movimientos.lastOrNull { it.nombre == entry.key }
+                items(
+                    if (cajasApi.isNotEmpty())
+                        cajasApi.map { it.producto to it.cantidad }
+                    else
+                        stockActual.entries.map { it.key to it.value }
+                ) { entry ->
+                    val nombreProducto = entry.first
+                    val cantidadProducto = entry.second
+
+                    val esBajo = cantidadProducto < 5
+                    val detalle = movimientos.lastOrNull {
+                        it.nombre == nombreProducto
+                    }
                     ProductoItem(
-                        nombre     = entry.key,
-                        stock      = entry.value,
+                        nombre = nombreProducto,
+                        stock = cantidadProducto,
                         categoria  = detalle?.categoria ?: "—",
                         destino    = detalle?.destino ?: "—",
                         bajoBstock = esBajo,
                         onEntrada  = {
                             InventarioManager.agregarMovimiento(
-                                entry.key, 1, "ENTRADA",
+                                nombreProducto, 1, "ENTRADA",
                                 detalle?.categoria ?: "", detalle?.destino ?: ""
                             )
                             reloadTick++
                         },
                         onSalida = {
                             InventarioManager.agregarMovimiento(
-                                entry.key, 1, "SALIDA",
+                                nombreProducto, 1, "SALIDA",
                                 detalle?.categoria ?: "", detalle?.destino ?: ""
                             )
                             reloadTick++
