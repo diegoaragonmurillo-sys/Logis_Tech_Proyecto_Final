@@ -9,6 +9,9 @@ data class QrData(
     val idCaja: String,
     val nombre: String,
     val cantidad: Int,
-    val destino: String = "",
-    val pesoKg: Double = 0.0
+    val destino: String        = "",
+    val pesoKg: Double         = 0.0,
+    val categoria: String      = "",
+    val tipoMovimiento: String = "",
+    val fecha: String          = ""
 )
