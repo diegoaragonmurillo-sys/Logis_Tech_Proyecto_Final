@@ -89,7 +89,21 @@ data class UbicacionRequest(
     val nivel: Int
 )
 
+data class LoginRequest(
+    val username: String,
+    val password: String
+)
+
+data class LoginResponse(
+    @SerializedName("access_token") val token: String? = null,
+    val rol: String = "",
+    val username: String? = null
+)
+
 interface LogistTechApi {
+
+    @POST("login")
+    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     @GET("tipos_caja")
     suspend fun getTiposCaja(): Response<List<TipoCaja>>
 

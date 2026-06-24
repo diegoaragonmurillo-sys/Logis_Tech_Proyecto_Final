@@ -47,7 +47,7 @@ fun GestionCajaScreen(
             } else { cajaExiste = false }
         } catch (e: Exception) { cajaExiste = false }
 
-        if (rol == SessionManager.Rol.ORGANIZADOR_ENTRADA) {
+        if (rol == SessionManager.Rol.BANDA) {
             viewModel.loadInitialData()
         }
     }
@@ -60,7 +60,7 @@ fun GestionCajaScreen(
             confirmButton = {
                 Button(onClick = {
                     showConfirmDialog = false
-                    viewModel.cambiarEstado(codigoQr, estadoAConfirmar, if(estadoAConfirmar=="EN_ESTANTE") selectedUbicacionId else null, onSuccess)
+                    viewModel.cambiarEstado(codigoQr, estadoAConfirmar, if (estadoAConfirmar == "EN_ESTANTE") selectedUbicacionId else null, onSuccess)
                 }) { Text("CONFIRMAR") }
             },
             dismissButton = { TextButton(onClick = { showConfirmDialog = false }) { Text("CANCELAR") } }
@@ -115,38 +115,52 @@ fun GestionCajaScreen(
                     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
                         Text("Caja Identificada: $codigoQr", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2980B9))
                         HorizontalDivider()
-                        
+
                         when (rol) {
-                            SessionManager.Rol.RECEPTOR_ENTRADA -> {
-                                InfoEvento("Recepción", "Valida el ingreso físico al almacén.", "CONFIRMAR INGRESO", { estadoAConfirmar = "RECEPCION_EN_ALMACEN"; showConfirmDialog = true }, viewModel.isLoading)
+                            SessionManager.Rol.RECEPTOR -> {
+                                InfoEvento(
+                                    "Recepción",
+                                    "Valida el ingreso físico al almacén.",
+                                    "CONFIRMAR INGRESO",
+                                    { estadoAConfirmar = "RECEPCION_EN_ALMACEN"; showConfirmDialog = true },
+                                    viewModel.isLoading
+                                )
                             }
-                            SessionManager.Rol.ORGANIZADOR_ENTRADA -> {
+                            SessionManager.Rol.BANDA -> {
                                 Text("Asignar a Estante", style = MaterialTheme.typography.titleLarge)
-                                ExposedDropdownMenuBox(expanded = expandedUbicaciones, onExpandedChange = { expandedUbicaciones = !expandedUbicaciones }) {
+                                ExposedDropdownMenuBox(
+                                    expanded = expandedUbicaciones,
+                                    onExpandedChange = { expandedUbicaciones = !expandedUbicaciones }
+                                ) {
                                     OutlinedTextField(
-                                        value = if(selectedUbicacionId.isEmpty()) "Seleccionar Ubicación" else selectedUbicacionId,
-                                        onValueChange = {}, readOnly = true, label = { Text("Coordenada Física") },
+                                        value = if (selectedUbicacionId.isEmpty()) "Seleccionar Ubicación" else selectedUbicacionId,
+                                        onValueChange = {}, readOnly = true,
+                                        label = { Text("Coordenada Física") },
                                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedUbicaciones) },
                                         modifier = Modifier.menuAnchor().fillMaxWidth()
                                     )
-                                    ExposedDropdownMenu(expanded = expandedUbicaciones, onDismissRequest = { expandedUbicaciones = false }) {
+                                    ExposedDropdownMenu(
+                                        expanded = expandedUbicaciones,
+                                        onDismissRequest = { expandedUbicaciones = false }
+                                    ) {
                                         viewModel.ubicacionesDisponibles.forEach { ubic ->
-                                            DropdownMenuItem(text = { Text(ubic.id_coordenada) }, onClick = { selectedUbicacionId = ubic.id_coordenada; expandedUbicaciones = false })
+                                            DropdownMenuItem(
+                                                text = { Text(ubic.id_coordenada) },
+                                                onClick = { selectedUbicacionId = ubic.id_coordenada; expandedUbicaciones = false }
+                                            )
                                         }
                                         HorizontalDivider()
-                                        DropdownMenuItem(text = { Text("+ Nueva Ubicación...") }, onClick = { expandedUbicaciones = false; showAddUbicDialog = true })
+                                        DropdownMenuItem(
+                                            text = { Text("+ Nueva Ubicación...") },
+                                            onClick = { expandedUbicaciones = false; showAddUbicDialog = true }
+                                        )
                                     }
                                 }
-                                Button(onClick = { estadoAConfirmar = "EN_ESTANTE"; showConfirmDialog = true }, modifier = Modifier.fillMaxWidth(), enabled = selectedUbicacionId.isNotBlank()) { Text("UBICAR EN ESTANTE") }
-                            }
-                            SessionManager.Rol.ORGANIZADOR_SALIDA -> {
-                                InfoEvento("Salida Estante", "Libera la ubicación para despacho.", "CONFIRMAR RETIRO", { estadoAConfirmar = "SALIDA_DE_ESTANTE"; showConfirmDialog = true }, viewModel.isLoading)
-                            }
-                            SessionManager.Rol.RECEPTOR_SALIDA -> {
-                                InfoEvento("Despacho", "Valida que la carga sale del centro.", "CONFIRMAR SALIDA", { estadoAConfirmar = "SALIENDO_DE_ALMACEN"; showConfirmDialog = true }, viewModel.isLoading)
-                            }
-                            SessionManager.Rol.CLIENTE -> {
-                                InfoEvento("Entrega Final", "¿Has recibido tu paquete?", "CONFIRMAR RECIBIDO", { estadoAConfirmar = "ENTREGADO"; showConfirmDialog = true }, viewModel.isLoading)
+                                Button(
+                                    onClick = { estadoAConfirmar = "EN_ESTANTE"; showConfirmDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = selectedUbicacionId.isNotBlank()
+                                ) { Text("UBICAR EN ESTANTE") }
                             }
                         }
                     }

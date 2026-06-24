@@ -18,7 +18,7 @@ class LogistViewModel : ViewModel() {
     var message by mutableStateOf<String?>(null)
     var ultimaNotificacion by mutableStateOf<String?>(null)
     var listaNotificaciones by mutableStateOf<List<Notificacion>>(emptyList())
-    
+
     var misCajas by mutableStateOf<List<Caja>>(emptyList())
     var todasLasCajas by mutableStateOf<List<Caja>>(emptyList())
     var miHistorialOperaciones by mutableStateOf<List<HistorialMovimiento>>(emptyList())
@@ -28,18 +28,14 @@ class LogistViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
-                // Cargar datos según el rol
-                if (SessionManager.rol == SessionManager.Rol.CLIENTE) {
-                    loadMisCajas()
-                } else {
-                    loadTodasLasCajas()
-                    loadHistorialOperador()
-                }
-                
+                // Sin cliente: todos los roles son de operación
+                loadTodasLasCajas()
+                loadHistorialOperador()
+
                 // Limpiar listas para forzar refresco visual
                 tiposCaja = emptyList()
                 ubicacionesDisponibles = emptyList()
-                
+
                 val respTipos = RetrofitClient.api.getTiposCaja()
                 if (respTipos.isSuccessful) {
                     val lista = respTipos.body() ?: emptyList()
@@ -50,12 +46,12 @@ class LogistViewModel : ViewModel() {
                         tiposCaja = lista
                     }
                 }
-                
+
                 val respUbic = RetrofitClient.api.getUbicacionesDisponibles()
                 if (respUbic.isSuccessful) {
                     ubicacionesDisponibles = respUbic.body() ?: emptyList()
                 }
-                
+
                 loadNotificaciones()
             } catch (e: Exception) {
                 message = "Error al cargar datos: ${e.message}"
@@ -70,12 +66,12 @@ class LogistViewModel : ViewModel() {
             try {
                 val userId = SessionManager.usuarioId.lowercase().trim()
                 Log.d("VM_DEBUG", "Solicitando cajas para: '$userId'")
-                
+
                 val resp = RetrofitClient.api.getCajasPorCliente(userId)
                 if (resp.isSuccessful) {
                     val lista = resp.body() ?: emptyList()
                     Log.d("VM_DEBUG", "SERVIDOR RESPONDIÓ OK. Cajas encontradas: ${lista.size}")
-                    misCajas = emptyList() // Forzar limpieza
+                    misCajas = emptyList()
                     misCajas = lista
                 } else {
                     Log.e("VM_DEBUG", "ERROR SERVIDOR: ${resp.code()} - ${resp.errorBody()?.string()}")
@@ -152,7 +148,7 @@ class LogistViewModel : ViewModel() {
             try {
                 val volumen = largo * ancho * alto
                 val request = TipoCaja(
-                    id = 0, // El servidor maneja el autoincrement
+                    id = 0,
                     nombre = nombre,
                     largo = largo,
                     ancho = ancho,
@@ -161,7 +157,7 @@ class LogistViewModel : ViewModel() {
                 )
                 val response = RetrofitClient.api.registrarTipoCaja(request)
                 if (response.isSuccessful) {
-                    loadInitialData() // Recargar lista
+                    loadInitialData()
                     onSuccess()
                 } else {
                     message = "Error al crear tipo: ${response.errorBody()?.string()}"
@@ -197,13 +193,13 @@ class LogistViewModel : ViewModel() {
                     peso_kg = peso,
                     prioridad = prioridad,
                     categoria = categoria,
-                    es_fragil = if (esFragil) 1 else 0, // Convertir de Boolean a Int para el servidor
+                    es_fragil = if (esFragil) 1 else 0,
                     id_proveedor = idProveedor,
                     id_tipo_caja = idTipoCaja
                 )
                 val response = RetrofitClient.api.registrarCaja(request)
                 if (response.isSuccessful) {
-                    loadInitialData() // Forzar recarga de Mis Cajas y Dashboard
+                    loadInitialData()
                     onSuccess()
                 } else {
                     message = "Error al registrar: ${response.errorBody()?.string()}"

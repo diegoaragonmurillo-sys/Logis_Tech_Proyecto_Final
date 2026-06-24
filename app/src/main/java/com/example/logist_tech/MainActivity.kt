@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
             Logist_TechTheme {
                 val viewModel: LogistViewModel = viewModel()
                 val context = LocalContext.current
-                
+
                 LaunchedEffect(SessionManager.estaLogueado()) {
                     if (SessionManager.estaLogueado()) {
                         viewModel.listenToNotifications()
@@ -110,11 +110,8 @@ class MainActivity : ComponentActivity() {
                                     val qr = ScannerResultHolder.textoQr
                                     if (qr.isNotBlank()) {
                                         val encodedQr = Uri.encode(qr)
-                                        if (SessionManager.rol == SessionManager.Rol.CLIENTE) {
-                                            navController.navigate("registro_caja/$encodedQr")
-                                        } else {
-                                            navController.navigate("gestion_caja/$encodedQr")
-                                        }
+                                        // Sin cliente: todos los trabajadores van a gestión
+                                        navController.navigate("gestion_caja/$encodedQr")
                                     } else {
                                         navController.navigate("ocr_result")
                                     }
