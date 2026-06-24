@@ -3,7 +3,6 @@
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,7 +13,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -39,15 +37,13 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.TextRecognizer
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.delay
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 enum class ScanMode { QR, OCR_FOTO }
 
-private const val QR_TIMEOUT_SECONDS = 4
+private const val QR_TIMEOUT_SECONDS = 8
 
 @Composable
 fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
@@ -67,13 +63,12 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
     var scanMode by remember { mutableStateOf(ScanMode.QR) }
     var qrTimeoutAlcanzado by remember { mutableStateOf(false) }
     var secondsWaiting by remember { mutableStateOf(0) }
+    var reintentoKey by remember { mutableStateOf(0) } // ← trigger para reiniciar timeout
 
-    // Para captura de foto
     var imageCaptureUseCase by remember { mutableStateOf<ImageCapture?>(null) }
     var procesandoFoto by remember { mutableStateOf(false) }
     var mensajeFoto by remember { mutableStateOf<String?>(null) }
 
-    // Entrada manual (testing)
     var showManualDialog by remember { mutableStateOf(false) }
     var manualText by remember { mutableStateOf("") }
 
@@ -88,8 +83,8 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
         ScannerResultHolder.imagenBitmap = null
     }
 
-    // Timeout QR → muestra botón de foto
-    LaunchedEffect(scanMode) {
+    // ← ahora usa reintentoKey además de scanMode para poder reiniciarse
+    LaunchedEffect(scanMode, reintentoKey) {
         if (scanMode == ScanMode.QR) {
             secondsWaiting = 0
             qrTimeoutAlcanzado = false
@@ -103,7 +98,6 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
         }
     }
 
-    // Diálogo entrada manual
     if (showManualDialog) {
         AlertDialog(
             onDismissRequest = { showManualDialog = false },
@@ -169,10 +163,9 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                 }
             )
 
-            // ── Overlay según estado ──────────────────────────────────
             Box(modifier = Modifier.fillMaxSize()) {
 
-                // Toggle BANDA arriba izquierda
+                // Toggle BANDA
                 if (rol == SessionManager.Rol.BANDA) {
                     Row(
                         modifier = Modifier
@@ -208,7 +201,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                     }
                 }
 
-                // Botón manual discreto arriba derecha
+                // Botón manual
                 IconButton(
                     onClick = { showManualDialog = true },
                     modifier = Modifier
@@ -216,11 +209,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                         .padding(top = 48.dp, end = 16.dp)
                         .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                 ) {
-                    Icon(
-                        Icons.Default.Keyboard,
-                        contentDescription = "Manual",
-                        tint = Color.White.copy(alpha = 0.5f)
-                    )
+                    Icon(Icons.Default.Keyboard, contentDescription = "Manual", tint = Color.White.copy(alpha = 0.5f))
                 }
 
                 // Marco de enfoque
@@ -239,9 +228,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                 // Aviso timeout
                 AnimatedVisibility(
                     visible = qrTimeoutAlcanzado && scanMode == ScanMode.QR,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = (-160).dp)
+                    modifier = Modifier.align(Alignment.Center).offset(y = (-160).dp)
                 ) {
                     Text(
                         "No se detectó QR",
@@ -253,12 +240,10 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                     )
                 }
 
-                // Countdown QR
+                // Countdown
                 AnimatedVisibility(
                     visible = !qrTimeoutAlcanzado && scanMode == ScanMode.QR && secondsWaiting > 0,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = 150.dp)
+                    modifier = Modifier.align(Alignment.Center).offset(y = 150.dp)
                 ) {
                     Text(
                         "Buscando QR (${QR_TIMEOUT_SECONDS - secondsWaiting}s)...",
@@ -267,7 +252,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                     )
                 }
 
-                // ── BOTÓN DE FOTO — aparece cuando timeout o modo OCR ──────
+                // Botones de foto
                 if (qrTimeoutAlcanzado || scanMode == ScanMode.OCR_FOTO) {
                     Column(
                         modifier = Modifier
@@ -276,10 +261,10 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (mensajeFoto != null) {
+                        mensajeFoto?.let {
                             Text(
-                                mensajeFoto!!,
-                                color = if (mensajeFoto!!.startsWith("✓")) Color(0xFF10B981) else Color(0xFFEF4444),
+                                it,
+                                color = if (it.startsWith("✓")) Color(0xFF10B981) else Color(0xFFEF4444),
                                 fontSize = 13.sp,
                                 modifier = Modifier
                                     .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
@@ -298,13 +283,12 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            // Botón reintentar QR
+                            // Reintentar QR — ahora usa reintentoKey++
                             if (qrTimeoutAlcanzado && scanMode == ScanMode.QR) {
                                 OutlinedButton(
                                     onClick = {
-                                        qrTimeoutAlcanzado = false
-                                        secondsWaiting = 0
-                                        scanMode = ScanMode.QR
+                                        mensajeFoto = null
+                                        reintentoKey++ // ← esto dispara el LaunchedEffect de nuevo
                                     },
                                     shape = RoundedCornerShape(50.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -316,7 +300,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                                 }
                             }
 
-                            // Botón tomar foto
+                            // Tomar foto
                             if (procesandoFoto) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(52.dp))
                             } else {
@@ -347,18 +331,12 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                                     containerColor = Color(0xFF2980B9),
                                     modifier = Modifier.size(72.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.CameraAlt,
-                                        contentDescription = "Tomar foto",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(32.dp)
-                                    )
+                                    Icon(Icons.Default.CameraAlt, contentDescription = "Tomar foto", tint = Color.White, modifier = Modifier.size(32.dp))
                                 }
                             }
                         }
                     }
                 } else {
-                    // Texto inferior modo QR
                     Text(
                         "Apunta al código QR del formulario o la caja",
                         color = Color.White,
@@ -415,17 +393,12 @@ fun CameraPreview(
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
-
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
-
-                // ImageCapture para la foto OCR
                 val imageCapture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
-
-                // Análisis QR en tiempo real
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -434,9 +407,7 @@ fun CameraPreview(
                     if (!yaProcesado && scanMode == ScanMode.QR) {
                         procesarFrameQR(imageProxy, barcodeScanner) { result ->
                             yaProcesado = true
-                            ContextCompat.getMainExecutor(context).execute {
-                                onQrDetected(result)
-                            }
+                            ContextCompat.getMainExecutor(context).execute { onQrDetected(result) }
                         }
                     } else {
                         imageProxy.close()
@@ -452,9 +423,7 @@ fun CameraPreview(
                         imageCapture,
                         imageAnalysis
                     )
-                    ContextCompat.getMainExecutor(ctx).execute {
-                        onImageCaptureReady(imageCapture)
-                    }
+                    ContextCompat.getMainExecutor(ctx).execute { onImageCaptureReady(imageCapture) }
                 } catch (e: Exception) {
                     Log.e("Scanner", "Error CameraX", e)
                 }
@@ -497,8 +466,9 @@ private fun tomarFotoYProcesarOCR(
     onTextoExtraido: (String) -> Unit,
     onError: () -> Unit
 ) {
-    val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
+    val textRecognizer = TextRecognition.getClient(
+        com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
+    )
     imageCapture.takePicture(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageCapturedCallback() {
@@ -506,10 +476,7 @@ private fun tomarFotoYProcesarOCR(
             override fun onCaptureSuccess(image: ImageProxy) {
                 val mediaImage = image.image
                 if (mediaImage != null) {
-                    val inputImage = InputImage.fromMediaImage(
-                        mediaImage,
-                        image.imageInfo.rotationDegrees
-                    )
+                    val inputImage = InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees)
                     textRecognizer.process(inputImage)
                         .addOnSuccessListener { visionText ->
                             image.close()
@@ -527,7 +494,6 @@ private fun tomarFotoYProcesarOCR(
                     onError()
                 }
             }
-
             override fun onError(exception: ImageCaptureException) {
                 Log.e("OCR_FOTO", "Error captura", exception)
                 onError()
