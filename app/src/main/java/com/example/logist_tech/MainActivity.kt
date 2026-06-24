@@ -24,15 +24,10 @@ import com.example.logist_tech.ui.screens.events.GestionCajaScreen
 import com.example.logist_tech.ui.screens.events.RegistroCajaScreen
 import com.example.logist_tech.ui.theme.Logist_TechTheme
 import com.example.logist_tech.ui.viewmodels.LogistViewModel
-import com.example.logist_tech.network.WebSocketManager
 import com.example.logist_tech.ocr.OcrResultScreen
-import com.example.logist_tech.inventory.InventarioScreen
-import com.example.logist_tech.history.HistoryScreen
-import com.example.logist_tech.anomalias.AnomaliasScreen
-import com.example.logist_tech.ui.screens.NotificationsScreen
 import com.example.logist_tech.ui.screens.DashboardScreen
-import com.example.logist_tech.ui.screens.MisCajasScreen
 import com.example.logist_tech.ui.screens.GlobalHistoryScreen
+import com.example.logist_tech.ui.screens.ReporteScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,15 +70,13 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+
                         composable("home") {
                             HomeScreen(
                                 onNavigateScanner = { navController.navigate("scanner") },
-                                onNavigateInventory = { navController.navigate("inventory") },
                                 onNavigateHistory = { navController.navigate("history") },
-                                onNavigateNotifications = { navController.navigate("notifications") },
-                                onNavigateMisCajas = { navController.navigate("mis_cajas") },
                                 onNavigateDashboard = { navController.navigate("dashboard") },
-                                onNavigatePerfil = { /* Pendiente */ },
+                                onNavigateReporte = { navController.navigate("reporte") },
                                 onLogout = {
                                     SessionManager.logout()
                                     navController.navigate("login") {
@@ -92,32 +85,58 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable("notifications") {
-                            NotificationsScreen(onNavigateBack = { navController.popBackStack() })
-                        }
-                        composable("mis_cajas") {
-                            MisCajasScreen(onNavigateBack = { navController.popBackStack() })
-                        }
+
                         composable("dashboard") {
                             DashboardScreen(onNavigateBack = { navController.popBackStack() })
                         }
+
                         composable("history") {
                             GlobalHistoryScreen(onNavigateBack = { navController.popBackStack() })
                         }
+
+                        composable("reporte") {
+                            ReporteScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
                         composable("scanner") {
                             ScannerScreen(
                                 onNavigarResultado = {
                                     val qr = ScannerResultHolder.textoQr
-                                    if (qr.isNotBlank()) {
-                                        val encodedQr = Uri.encode(qr)
-                                        // Sin cliente: todos los trabajadores van a gestión
-                                        navController.navigate("gestion_caja/$encodedQr")
-                                    } else {
-                                        navController.navigate("ocr_result")
+                                    val ocr = ScannerResultHolder.textoOcr
+
+                                    when {
+                                        // Hay QR — flujo normal por rol
+                                        qr.isNotBlank() -> {
+                                            val encodedQr = Uri.encode(qr)
+                                            val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
+                                                "registro_caja/$encodedQr"
+                                            else
+                                                "gestion_caja/$encodedQr"
+                                            navController.navigate(destino)
+                                        }
+
+                                        // Hay OCR — extraer idCaja del texto
+                                        ocr.isNotBlank() -> {
+                                            val qrData = com.example.logist_tech.ocr.OcrProcessor.parsearQr(ocr)
+                                            val idCaja = qrData?.idCaja ?: ""
+
+                                            if (idCaja.isNotBlank()) {
+                                                val encodedQr = Uri.encode(idCaja)
+                                                val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
+                                                    "registro_caja/$encodedQr"
+                                                else
+                                                    "gestion_caja/$encodedQr"
+                                                navController.navigate(destino)
+                                            } else {
+                                                // OCR no encontró ID — mostrar resultado para corrección manual
+                                                navController.navigate("ocr_result")
+                                            }
+                                        }
                                     }
                                 }
                             )
                         }
+
                         composable("registro_caja/{qr}") { backStackEntry ->
                             val encodedQr = backStackEntry.arguments?.getString("qr") ?: ""
                             val qr = Uri.decode(encodedQr)
@@ -127,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+
                         composable("gestion_caja/{qr}") { backStackEntry ->
                             val encodedQr = backStackEntry.arguments?.getString("qr") ?: ""
                             val qr = Uri.decode(encodedQr)
@@ -136,23 +156,16 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+
                         composable("ocr_result") {
                             OcrResultScreen(
-                                textoOcr        = ScannerResultHolder.textoOcr,
-                                textoQr         = ScannerResultHolder.textoQr,
+                                textoOcr = ScannerResultHolder.textoOcr,
+                                textoQr = ScannerResultHolder.textoQr,
                                 imagenCapturada = ScannerResultHolder.imagenBitmap,
                                 onRegistrarEnInventario = {
-                                    navController.navigate("inventory") {
-                                        popUpTo("scanner") { inclusive = true }
-                                    }
+                                    navController.popBackStack()
                                 }
                             )
-                        }
-                        composable("inventory") {
-                            InventarioScreen(onNavigateBack = { navController.popBackStack() })
-                        }
-                        composable("anomalias") {
-                            AnomaliasScreen(onNavigateBack = { navController.popBackStack() })
                         }
                     }
                 }
