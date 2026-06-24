@@ -6,7 +6,7 @@ import retrofit2.http.*
 
 data class Caja(
     val codigo_qr: String = "",
-    val id_cliente: String = "",
+    val id_operador: String = "",
     val producto: String = "",
     val cantidad: Int = 0,
     val peso_kg: Double = 0.0,
@@ -37,18 +37,10 @@ data class Ubicacion(
     val estado_ocupacion: Int = 0
 )
 
-data class Notificacion(
-    val id: Int = 0,
-    val id_caja: String = "",
-    val mensaje_enviado: String = "",
-    val fecha_envio: String = "",
-    val estado_envio: String = ""
-)
-
 data class HistorialMovimiento(
     val id: Int = 0,
     val id_caja: String = "",
-    val producto: String = "", // Cruce con tabla caja
+    val producto: String = "",
     val id_operador: String = "",
     val tipo_operador: String = "",
     val estado_anterior: String = "",
@@ -58,7 +50,6 @@ data class HistorialMovimiento(
 
 data class RegistroCajaRequest(
     val codigo_qr: String,
-    val id_cliente: String,
     val producto: String,
     val cantidad: Int,
     val peso_kg: Double,
@@ -69,11 +60,10 @@ data class RegistroCajaRequest(
     val id_tipo_caja: String
 )
 
+// El backend saca id_operador y tipo_operador del JWT — no hace falta en el body
 data class CambioEstadoRequest(
     val codigo_qr: String,
     val nuevo_estado: String,
-    val id_operador: String,
-    val tipo_operador: String,
     val id_ubicacion: String? = ""
 )
 
@@ -100,10 +90,33 @@ data class LoginResponse(
     val username: String? = null
 )
 
+// ── Modelos para el Reporte con Gemini ────────────────────────────────────────
+data class ReporteDatos(
+    val total_cajas: Int = 0,
+    val entregadas: Int = 0,
+    val pendientes: Int = 0,
+    val cajas_por_estado: Map<String, Int> = emptyMap(),
+    val top_operador: String = "",
+    val operadores: List<Map<String, Any>> = emptyList(),
+    val estantes_ocupados: Int = 0,
+    val estantes_libres: Int = 0,
+    val estantes_total: Int = 0,
+    val en_proceso: Int = 0
+)
+
+data class ReporteResponse(
+    val periodo: String = "",
+    val fecha_inicio: String = "",
+    val fecha_fin: String = "",
+    val datos: ReporteDatos = ReporteDatos(),
+    val analisis_ia: String = ""
+)
+
 interface LogistTechApi {
 
     @POST("login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+
     @GET("tipos_caja")
     suspend fun getTiposCaja(): Response<List<TipoCaja>>
 
@@ -125,18 +138,12 @@ interface LogistTechApi {
     @GET("cajas/todas")
     suspend fun getTodasLasCajas(): Response<List<Caja>>
 
-    @GET("cajas/cliente/{usuario_id}")
-    suspend fun getCajasPorCliente(@Path("usuario_id") usuarioId: String): Response<List<Caja>>
-
-    @GET("notificaciones/{usuario_id}")
-    suspend fun getNotificaciones(@Path("usuario_id") usuarioId: String): Response<List<Notificacion>>
-
-    @GET("historial/operador/{usuario_id}")
-    suspend fun getHistorialOperador(@Path("usuario_id") usuarioId: String): Response<List<HistorialMovimiento>>
-
     @GET("historial/todos")
     suspend fun getHistorialGlobal(): Response<List<HistorialMovimiento>>
 
     @GET("caja/{qr}")
     suspend fun getCaja(@Path("qr") qr: String): Response<Caja>
+
+    @GET("reporte/general")
+    suspend fun getReporte(@Query("periodo") periodo: String): Response<ReporteResponse>
 }
