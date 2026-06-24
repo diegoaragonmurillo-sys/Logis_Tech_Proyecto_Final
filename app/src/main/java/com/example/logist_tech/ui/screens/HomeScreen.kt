@@ -30,6 +30,7 @@ fun HomeScreen(
     onNavigateNotifications: () -> Unit = {},
     onNavigateMisCajas: () -> Unit = {},
     onNavigateDashboard: () -> Unit = {},
+    onNavigateReporte: () -> Unit = {},
     onNavigatePerfil: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -85,16 +86,16 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Grid de Opciones (BANDA / RECEPTOR ven el mismo menú de operación)
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.weight(1f)
         ) {
-            item { MenuCard("Escanear / Cambiar", Icons.Filled.QrCodeScanner, onNavigateScanner) }
+            item { MenuCard("Escanear / Registrar", Icons.Filled.QrCodeScanner, onNavigateScanner) }
             item { MenuCard("Dashboard Vivo", Icons.Filled.Dashboard, onNavigateDashboard) }
             item { MenuCard("Mi Historial", Icons.Filled.History, onNavigateHistory) }
+            item { MenuCard("Reporte IA", Icons.Filled.Analytics, onNavigateReporte) }
         }
     }
 }
