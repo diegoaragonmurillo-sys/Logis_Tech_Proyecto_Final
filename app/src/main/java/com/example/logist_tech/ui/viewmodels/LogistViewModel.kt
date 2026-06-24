@@ -17,22 +17,21 @@ class LogistViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
     var ultimaNotificacion by mutableStateOf<String?>(null)
-    var listaNotificaciones by mutableStateOf<List<Notificacion>>(emptyList())
 
-    var misCajas by mutableStateOf<List<Caja>>(emptyList())
     var todasLasCajas by mutableStateOf<List<Caja>>(emptyList())
-    var miHistorialOperaciones by mutableStateOf<List<HistorialMovimiento>>(emptyList())
     var historialGlobal by mutableStateOf<List<HistorialMovimiento>>(emptyList())
+
+    // Estado del reporte
+    var reporte by mutableStateOf<ReporteResponse?>(null)
+    var reporteLoading by mutableStateOf(false)
+    var reporteError by mutableStateOf<String?>(null)
 
     fun loadInitialData() {
         viewModelScope.launch {
             isLoading = true
             try {
-                // Sin cliente: todos los roles son de operación
                 loadTodasLasCajas()
-                loadHistorialOperador()
 
-                // Limpiar listas para forzar refresco visual
                 tiposCaja = emptyList()
                 ubicacionesDisponibles = emptyList()
 
@@ -40,8 +39,7 @@ class LogistViewModel : ViewModel() {
                 if (respTipos.isSuccessful) {
                     val lista = respTipos.body() ?: emptyList()
                     if (lista.isEmpty()) {
-                        Log.d("VM", "Lista vacía, intentando registro automático de prueba...")
-                        registrarTipoCaja("Caja Estándar AI", 40.0, 40.0, 40.0) {}
+                        registrarTipoCaja("Caja Estándar", 40.0, 40.0, 40.0) {}
                     } else {
                         tiposCaja = lista
                     }
@@ -52,32 +50,10 @@ class LogistViewModel : ViewModel() {
                     ubicacionesDisponibles = respUbic.body() ?: emptyList()
                 }
 
-                loadNotificaciones()
             } catch (e: Exception) {
                 message = "Error al cargar datos: ${e.message}"
             } finally {
                 isLoading = false
-            }
-        }
-    }
-
-    fun loadMisCajas() {
-        viewModelScope.launch {
-            try {
-                val userId = SessionManager.usuarioId.lowercase().trim()
-                Log.d("VM_DEBUG", "Solicitando cajas para: '$userId'")
-
-                val resp = RetrofitClient.api.getCajasPorCliente(userId)
-                if (resp.isSuccessful) {
-                    val lista = resp.body() ?: emptyList()
-                    Log.d("VM_DEBUG", "SERVIDOR RESPONDIÓ OK. Cajas encontradas: ${lista.size}")
-                    misCajas = emptyList()
-                    misCajas = lista
-                } else {
-                    Log.e("VM_DEBUG", "ERROR SERVIDOR: ${resp.code()} - ${resp.errorBody()?.string()}")
-                }
-            } catch (e: Exception) {
-                Log.e("VM_DEBUG", "FALLO DE RED O PARSEO", e)
             }
         }
     }
@@ -91,16 +67,9 @@ class LogistViewModel : ViewModel() {
                     todasLasCajas = resp.body() ?: emptyList()
                     Log.d("VM_DEBUG", "Dashboard actualizado: ${todasLasCajas.size} cajas")
                 }
-            } catch (e: Exception) { Log.e("VM_DEBUG", "Error dashboard", e) }
-        }
-    }
-
-    fun loadHistorialOperador() {
-        viewModelScope.launch {
-            try {
-                val resp = RetrofitClient.api.getHistorialOperador(SessionManager.usuarioId)
-                if (resp.isSuccessful) miHistorialOperaciones = resp.body() ?: emptyList()
-            } catch (e: Exception) { Log.e("VM", "Error historial", e) }
+            } catch (e: Exception) {
+                Log.e("VM_DEBUG", "Error dashboard", e)
+            }
         }
     }
 
@@ -109,25 +78,29 @@ class LogistViewModel : ViewModel() {
             try {
                 val resp = RetrofitClient.api.getHistorialGlobal()
                 if (resp.isSuccessful) historialGlobal = resp.body() ?: emptyList()
-            } catch (e: Exception) { Log.e("VM", "Error historial global", e) }
-        }
-    }
-
-    fun loadNotificaciones() {
-        viewModelScope.launch {
-            try {
-                val response = RetrofitClient.api.getNotificaciones(SessionManager.usuarioId)
-                if (response.isSuccessful) {
-                    listaNotificaciones = response.body() ?: emptyList()
-                }
             } catch (e: Exception) {
-                Log.e("ViewModel", "Error cargando notificaciones", e)
+                Log.e("VM", "Error historial global", e)
             }
         }
     }
 
-    fun registrarTokenFCM(token: String) {
-        // No usar Firebase
+    fun loadReporte(periodo: String = "diario") {
+        viewModelScope.launch {
+            reporteLoading = true
+            reporteError = null
+            try {
+                val resp = RetrofitClient.api.getReporte(periodo)
+                if (resp.isSuccessful) {
+                    reporte = resp.body()
+                } else {
+                    reporteError = "Error del servidor (${resp.code()})"
+                }
+            } catch (e: Exception) {
+                reporteError = "No se pudo cargar el reporte: ${e.message}"
+            } finally {
+                reporteLoading = false
+            }
+        }
     }
 
     fun listenToNotifications() {
@@ -147,14 +120,7 @@ class LogistViewModel : ViewModel() {
             isLoading = true
             try {
                 val volumen = largo * ancho * alto
-                val request = TipoCaja(
-                    id = 0,
-                    nombre = nombre,
-                    largo = largo,
-                    ancho = ancho,
-                    alto = alto,
-                    volumen = volumen
-                )
+                val request = TipoCaja(id = 0, nombre = nombre, largo = largo, ancho = ancho, alto = alto, volumen = volumen)
                 val response = RetrofitClient.api.registrarTipoCaja(request)
                 if (response.isSuccessful) {
                     loadInitialData()
@@ -185,15 +151,15 @@ class LogistViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
+                // id_cliente ya no va en el body — el backend lo saca del JWT
                 val request = RegistroCajaRequest(
-                    codigo_qr = codigoQr,
-                    id_cliente = SessionManager.usuarioId,
-                    producto = producto,
-                    cantidad = cantidad,
-                    peso_kg = peso,
-                    prioridad = prioridad,
-                    categoria = categoria,
-                    es_fragil = if (esFragil) 1 else 0,
+                    codigo_qr    = codigoQr,
+                    producto     = producto,
+                    cantidad     = cantidad,
+                    peso_kg      = peso,
+                    prioridad    = prioridad,
+                    categoria    = categoria,
+                    es_fragil    = if (esFragil) 1 else 0,
                     id_proveedor = idProveedor,
                     id_tipo_caja = idTipoCaja
                 )
@@ -247,10 +213,9 @@ class LogistViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
+                // id_operador y tipo_operador ya no van en el body — el backend los saca del JWT
                 val request = CambioEstadoRequest(
-                    codigo_qr = codigoQr,
-                    id_operador = SessionManager.usuarioId,
-                    tipo_operador = SessionManager.rol.name,
+                    codigo_qr    = codigoQr,
                     nuevo_estado = nuevoEstado,
                     id_ubicacion = idUbicacion
                 )
