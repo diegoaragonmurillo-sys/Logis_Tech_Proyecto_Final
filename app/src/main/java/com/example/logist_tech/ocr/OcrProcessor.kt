@@ -1,6 +1,19 @@
 package com.example.logist_tech.ocr
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 object OcrProcessor {
+
+    private fun fechaActual() =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+    fun extraerIdDeTexto(texto: String): String {
+        val lineas = texto.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val raw = extraerCampoTexto(lineas, listOf("id", "codigo", "serie", "idcaja"))
+        return if (Regex("^CJ-\\d{4}$").matches(raw)) raw else ""
+    }
 
     fun parsearTextoOcr(textoOcr: String): OcrData {
         val lineas = textoOcr.lines().map { it.trim() }.filter { it.isNotBlank() }
@@ -11,12 +24,18 @@ object OcrProcessor {
         val categoria      = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
         val destino        = extraerCampoTexto(lineas, listOf("destino", "destination", "para"))
         val tipoMovimiento = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
-        val fecha          = extraerCampoTexto(lineas, listOf("fecha", "date"))
+        val prioridad      = extraerCampoTexto(lineas, listOf("prioridad", "priority"))
+        val esFragilStr    = extraerCampoTexto(lineas, listOf("fragil", "fragile"))
+        val esFragil       = if (esFragilStr == "1" || esFragilStr.lowercase() == "si") 1 else 0
+        val idProveedor    = extraerCampoTexto(lineas, listOf("proveedor", "provider", "id_proveedor"))
+        val idTipoCaja     = extraerCampoTexto(lineas, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
+        val fecha          = fechaActual()
 
         val camposFaltantes = mutableListOf<String>()
-        if (nombre.isBlank())  camposFaltantes.add("producto")
-        if (cantidad == 0)     camposFaltantes.add("cantidad")
-        if (destino.isBlank()) camposFaltantes.add("destino")
+        if (nombre.isBlank())     camposFaltantes.add("producto")
+        if (cantidad == 0)        camposFaltantes.add("cantidad")
+        if (prioridad.isBlank())  camposFaltantes.add("prioridad")
+        if (idTipoCaja.isBlank()) camposFaltantes.add("tipo_caja")
 
         return OcrData(
             nombre          = nombre,
@@ -27,7 +46,11 @@ object OcrProcessor {
             tipoMovimiento  = tipoMovimiento,
             fecha           = fecha,
             textoOriginal   = textoOcr,
-            camposFaltantes = camposFaltantes
+            camposFaltantes = camposFaltantes,
+            prioridad       = prioridad,
+            esFragil        = esFragil,
+            idProveedor     = idProveedor,
+            idTipoCaja      = idTipoCaja
         )
     }
 
@@ -36,16 +59,21 @@ object OcrProcessor {
 
         val lineas = qrTexto.lines().map { it.trim() }.filter { it.isNotBlank() }
 
-        val idCaja         = extraerCampoTexto(lineas, listOf("idcaja", "id", "caja"))
+        val idCaja         = extraerCampoTexto(lineas, listOf("id", "idcaja", "caja", "codigo"))
         val nombre         = extraerCampoTexto(lineas, listOf("producto", "nombre", "item"))
         val cantidad       = extraerCampoNumeroEntero(lineas, listOf("cantidad", "qty", "unidades"))
         val destino        = extraerCampoTexto(lineas, listOf("destino", "destination", "para"))
         val pesoKg         = extraerCampoNumeroDecimal(lineas, listOf("peso", "kg", "weight"))
         val categoria      = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
         val tipoMovimiento = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
-        val fecha          = extraerCampoTexto(lineas, listOf("fecha", "date"))
+        val prioridad      = extraerCampoTexto(lineas, listOf("prioridad", "priority"))
+        val esFragilStr    = extraerCampoTexto(lineas, listOf("fragil", "fragile"))
+        val esFragil       = if (esFragilStr == "1" || esFragilStr.lowercase() == "si") 1 else 0
+        val idProveedor    = extraerCampoTexto(lineas, listOf("proveedor", "provider", "id_proveedor"))
+        val idTipoCaja     = extraerCampoTexto(lineas, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
+        val fecha          = fechaActual()
 
-        if (idCaja.isBlank() && nombre.isBlank() && cantidad == 0 && destino.isBlank()) return null
+        if (idCaja.isBlank() && nombre.isBlank() && cantidad == 0) return null
 
         return QrData(
             idCaja         = idCaja,
@@ -55,7 +83,11 @@ object OcrProcessor {
             pesoKg         = pesoKg,
             categoria      = categoria,
             tipoMovimiento = tipoMovimiento,
-            fecha          = fecha
+            fecha          = fecha,
+            prioridad      = prioridad,
+            esFragil       = esFragil,
+            idProveedor    = idProveedor,
+            idTipoCaja     = idTipoCaja
         )
     }
 
