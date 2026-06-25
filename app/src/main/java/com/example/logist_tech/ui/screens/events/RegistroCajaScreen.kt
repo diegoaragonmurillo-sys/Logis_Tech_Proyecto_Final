@@ -39,29 +39,61 @@ fun RegistroCajaScreen(
         if (ocrTexto.isNotBlank()) OcrProcessor.parsearTextoOcr(ocrTexto) else null
     }
 
-    val codigoFinal = remember {
-        codigoQr.ifBlank {
+    val qrData = remember(codigoQr) {
+        OcrProcessor.parsearQr(codigoQr)
+    }
+
+    val codigoFinal = remember(codigoQr, qrData) {
+        if (qrData != null && !qrData.idCaja.isBlank()) {
+            qrData.idCaja
+        } else if (codigoQr.isNotBlank()) {
+            codigoQr
+        } else {
             "CJ-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())
         }
     }
 
-    var producto    by remember { mutableStateOf(ocrData?.nombre    ?: "") }
-    var cantidad    by remember { mutableStateOf(if ((ocrData?.cantidad ?: 0) > 0) ocrData!!.cantidad.toString() else "1") }
-    var peso        by remember { mutableStateOf(if ((ocrData?.pesoKg ?: 0.0) > 0.0) ocrData!!.pesoKg.toString() else "0.5") }
-    var categoria   by remember { mutableStateOf(ocrData?.categoria  ?: "GENERAL") }
+    var producto    by remember {
+        mutableStateOf(
+            qrData?.nombre?.ifBlank { null }
+                ?: ocrData?.nombre?.ifBlank { null }
+                ?: ""
+        )
+    }
+    var cantidad    by remember {
+        mutableStateOf(
+            if (qrData != null && qrData.cantidad > 0) qrData.cantidad.toString()
+            else if (ocrData != null && ocrData.cantidad > 0) ocrData.cantidad.toString()
+            else "1"
+        )
+    }
+    var peso        by remember {
+        mutableStateOf(
+            if (qrData != null && qrData.pesoKg > 0.0) qrData.pesoKg.toString()
+            else if (ocrData != null && ocrData.pesoKg > 0.0) ocrData.pesoKg.toString()
+            else "0.5"
+        )
+    }
+    var categoria   by remember {
+        mutableStateOf(
+            (qrData?.categoria?.ifBlank { null }
+                ?: ocrData?.categoria?.ifBlank { null }
+                ?: "GENERAL").uppercase(Locale.getDefault())
+        )
+    }
     var prioridad   by remember { mutableStateOf("NORMAL") }
     var esFragil    by remember { mutableStateOf(false) }
     var idProveedor by remember { mutableStateOf("PROV-001") }
     var selectedTipoId  by remember { mutableStateOf("") }
     var expandedTipos   by remember { mutableStateOf(false) }
 
-    // Campos llenados por OCR para mostrar badge
-    val camposPreLlenados = remember(ocrData) {
+    // Campos llenados por OCR / QR para mostrar badge
+    val camposPreLlenados = remember(qrData, ocrData) {
         buildList {
-            if (!ocrData?.nombre.isNullOrBlank())      add("Producto")
-            if ((ocrData?.cantidad ?: 0) > 0)          add("Cantidad")
-            if ((ocrData?.pesoKg ?: 0.0) > 0.0)        add("Peso")
-            if (!ocrData?.categoria.isNullOrBlank())   add("Categoría")
+            if (!qrData?.nombre.isNullOrBlank() || !ocrData?.nombre.isNullOrBlank()) add("Producto")
+            if ((qrData?.cantidad ?: 0) > 0 || (ocrData?.cantidad ?: 0) > 0)          add("Cantidad")
+            if ((qrData?.pesoKg ?: 0.0) > 0.0 || (ocrData?.pesoKg ?: 0.0) > 0.0)        add("Peso")
+            if (!qrData?.categoria.isNullOrBlank() || !ocrData?.categoria.isNullOrBlank())   add("Categoría")
         }
     }
 
@@ -73,16 +105,23 @@ fun RegistroCajaScreen(
     var nuevoAncho         by remember { mutableStateOf("") }
     var nuevoAlto          by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        try {
-            val response = RetrofitClient.api.getTodasLasCajas()
-            if (response.isSuccessful) {
-                cajaYaExiste = response.body()?.any { it.codigo_qr == codigoFinal } ?: false
-            } else {
-                cajaYaExiste = false
+    LaunchedEffect(codigoFinal, viewModel.todasLasCajas) {
+        val checkLocal = viewModel.todasLasCajas.any { it.codigo_qr == codigoFinal }
+        if (checkLocal) {
+            cajaYaExiste = true
+        } else {
+            try {
+                val response = RetrofitClient.api.getTodasLasCajas()
+                if (response.isSuccessful) {
+                    val apiCajas = response.body() ?: emptyList()
+                    val checkApi = apiCajas.any { it.codigo_qr == codigoFinal }
+                    cajaYaExiste = checkApi || viewModel.todasLasCajas.any { it.codigo_qr == codigoFinal }
+                } else {
+                    cajaYaExiste = viewModel.todasLasCajas.any { it.codigo_qr == codigoFinal }
+                }
+            } catch (e: Exception) {
+                cajaYaExiste = viewModel.todasLasCajas.any { it.codigo_qr == codigoFinal }
             }
-        } catch (e: Exception) {
-            cajaYaExiste = false
         }
         viewModel.loadInitialData()
     }
