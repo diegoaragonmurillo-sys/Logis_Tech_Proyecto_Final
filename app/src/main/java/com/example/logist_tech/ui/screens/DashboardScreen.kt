@@ -31,8 +31,22 @@ fun DashboardScreen(
         viewModel.loadTodasLasCajas()
     }
 
+    // Agrupar cajas por producto con su cantidad total
+    // Solo cajas que no han sido entregadas (en stock activo)
+    val stockPorProducto = viewModel.todasLasCajas
+        .filter { it.estado != "ENTREGADO" }
+        .groupBy { it.producto.ifBlank { "Sin nombre" } }
+        .map { (producto, cajas) ->
+            Triple(
+                producto,
+                cajas.sumOf { it.cantidad },  // cantidad total de unidades
+                cajas.size                     // número de cajas
+            )
+        }
+        .sortedByDescending { it.second }
+
     Scaffold(
-        containerColor = Color(0xFFF8FAFC), // Gris azulado ultra claro (Minimalista)
+        containerColor = Color(0xFFF8FAFC),
         topBar = {
             TopAppBar(
                 title = { Text("Dashboard Operativo", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp) },
@@ -45,33 +59,108 @@ fun DashboardScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(horizontal = 20.dp)) {
-            
-            // Sección de Estadísticas Rápidas (Estilo limpio)
-            Row(
-                modifier = Modifier.padding(vertical = 20.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatChip("Total", viewModel.todasLasCajas.size.toString(), Color(0xFF2980B9), Modifier.weight(1f))
-                StatChip("Estante", viewModel.todasLasCajas.count { it.estado == "EN_ESTANTE" }.toString(), Color(0xFF10B981), Modifier.weight(1f))
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // ── Stats rápidas ──────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatChip("Total cajas", viewModel.todasLasCajas.size.toString(), Color(0xFF2980B9), Modifier.weight(1f))
+                    StatChip("En almacén", viewModel.todasLasCajas.count { it.estado != "ENTREGADO" }.toString(), Color(0xFF10B981), Modifier.weight(1f))
+                    StatChip("Entregadas", viewModel.todasLasCajas.count { it.estado == "ENTREGADO" }.toString(), Color(0xFF64748B), Modifier.weight(1f))
+                }
             }
 
-            Text(
-                text = "FLUJO DE CAJAS EN TIEMPO REAL",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            // ── Stock por producto ─────────────────────────────────────
+            item {
+                Text(
+                    text = "STOCK POR PRODUCTO",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 1.2.sp
+                )
+            }
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 20.dp)
-            ) {
-                items(viewModel.todasLasCajas) { caja ->
-                    MinimalistCajaItem(caja)
+            if (stockPorProducto.isEmpty()) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No hay productos en stock", color = Color.Gray)
+                        }
+                    }
                 }
+            } else {
+                items(stockPorProducto) { (producto, unidades, cajas) ->
+                    StockProductoCard(producto, unidades, cajas)
+                }
+            }
+
+            // ── Flujo de cajas ─────────────────────────────────────────
+            item {
+                Text(
+                    text = "FLUJO DE CAJAS EN TIEMPO REAL",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 1.2.sp
+                )
+            }
+
+            items(viewModel.todasLasCajas) { caja ->
+                MinimalistCajaItem(caja)
+            }
+        }
+    }
+}
+
+@Composable
+fun StockProductoCard(producto: String, unidades: Int, cajas: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = producto,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B)
+                )
+                Text(
+                    text = "$cajas ${if (cajas == 1) "caja" else "cajas"}",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = unidades.toString(),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF2980B9)
+                )
+                Text(
+                    text = "unidades",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
             }
         }
     }
@@ -95,7 +184,6 @@ fun StatChip(label: String, value: String, color: Color, modifier: Modifier) {
 @Composable
 fun MinimalistCajaItem(caja: Caja) {
     val stateColor = getEstadoColor(caja.estado)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -106,35 +194,21 @@ fun MinimalistCajaItem(caja: Caja) {
             modifier = Modifier.height(IntrinsicSize.Min).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Barra de estado minimalista (lateral)
-            Box(
-                modifier = Modifier
-                    .width(6.dp)
-                    .fillMaxHeight()
-                    .background(stateColor)
-            )
-
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Box(modifier = Modifier.width(6.dp).fillMaxHeight().background(stateColor))
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = caja.producto.ifBlank { "Producto sin nombre" },
+                        text = caja.producto.ifBlank { "Sin nombre" },
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = Color(0xFF1E293B)
                     )
-                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "ID: ${caja.codigo_qr}",
+                        text = "ID: ${caja.codigo_qr}  •  ${caja.cantidad} uds",
                         fontSize = 12.sp,
-                        color = Color.Gray,
-                        letterSpacing = 0.5.sp
+                        color = Color.Gray
                     )
                 }
-
-                // Estado al final con punto indicador
                 Column(horizontalAlignment = Alignment.End) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(8.dp).background(stateColor, CircleShape))
@@ -153,13 +227,13 @@ fun MinimalistCajaItem(caja: Caja) {
 }
 
 fun getEstadoColor(estado: String): Color {
-    return when(estado) {
-        "REGISTRADO" -> Color(0xFF3B82F6) // Azul
-        "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B) // Ambar
-        "EN_ESTANTE" -> Color(0xFF10B981) // Esmeralda
-        "SALIDA_DE_ESTANTE" -> Color(0xFF8B5CF6) // Violeta
-        "SALIENDO_DE_ALMACEN" -> Color(0xFFEC4899) // Rosa
-        "ENTREGADO" -> Color(0xFF64748B) // Pizarra
-        else -> Color.Gray
+    return when (estado) {
+        "REGISTRADO"           -> Color(0xFF3B82F6)
+        "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B)
+        "EN_ESTANTE"           -> Color(0xFF10B981)
+        "SALIDA_DE_ESTANTE"    -> Color(0xFF8B5CF6)
+        "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899)
+        "ENTREGADO"            -> Color(0xFF64748B)
+        else                   -> Color.Gray
     }
 }
