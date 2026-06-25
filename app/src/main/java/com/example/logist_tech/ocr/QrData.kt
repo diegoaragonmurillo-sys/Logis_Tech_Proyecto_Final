@@ -13,5 +13,9 @@ data class QrData(
     val pesoKg: Double         = 0.0,
     val categoria: String      = "",
     val tipoMovimiento: String = "",
-    val fecha: String          = ""
+    val fecha: String          = "",
+    val prioridad: String      = "",
+    val esFragil: Int          = 0,
+    val idProveedor: String    = "",
+    val idTipoCaja: String     = ""
 )
