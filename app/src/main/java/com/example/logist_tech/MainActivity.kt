@@ -105,9 +105,11 @@ class MainActivity : ComponentActivity() {
                                     val ocr = ScannerResultHolder.textoOcr
 
                                     when {
-                                        // Hay QR — flujo normal por rol
                                         qr.isNotBlank() -> {
-                                            val encodedQr = Uri.encode(qr)
+                                            val qrData = com.example.logist_tech.ocr.OcrProcessor.parsearQr(qr)
+                                            val idCaja = qrData?.idCaja?.ifBlank { qr } ?: qr
+                                            val encodedQr = Uri.encode(idCaja)
+
                                             val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
                                                 "registro_caja/$encodedQr"
                                             else
@@ -115,7 +117,6 @@ class MainActivity : ComponentActivity() {
                                             navController.navigate(destino)
                                         }
 
-                                        // Hay OCR — extraer idCaja del texto
                                         ocr.isNotBlank() -> {
                                             val qrData = com.example.logist_tech.ocr.OcrProcessor.parsearQr(ocr)
                                             val idCaja = qrData?.idCaja ?: ""
@@ -128,7 +129,6 @@ class MainActivity : ComponentActivity() {
                                                     "gestion_caja/$encodedQr"
                                                 navController.navigate(destino)
                                             } else {
-                                                // OCR no encontró ID — mostrar resultado para corrección manual
                                                 navController.navigate("ocr_result")
                                             }
                                         }
