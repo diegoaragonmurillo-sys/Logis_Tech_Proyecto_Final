@@ -1,5 +1,10 @@
 package com.example.logist_tech.ocr
 
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+
 object OcrProcessor {
 
     fun parsearTextoOcr(textoOcr: String): OcrData {
@@ -8,10 +13,18 @@ object OcrProcessor {
         val nombre         = extraerCampoTexto(lineas, listOf("producto", "nombre", "item"))
         val cantidad       = extraerCampoNumeroEntero(lineas, listOf("cantidad", "qty", "unidades"))
         val pesoKg         = extraerCampoNumeroDecimal(lineas, listOf("peso", "kg", "weight"))
-        val categoria      = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
+        val categoriaVal   = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
         val destino        = extraerCampoTexto(lineas, listOf("destino", "destination", "para"))
-        val tipoMovimiento = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
-        val fecha          = extraerCampoTexto(lineas, listOf("fecha", "date"))
+        val tipoMovimientoVal = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
+        val fechaVal       = extraerCampoTexto(lineas, listOf("fecha", "date"))
+
+        val categoria = if (categoriaVal.isBlank()) "General" else categoriaVal
+        val tipoMovimiento = if (tipoMovimientoVal.isBlank()) "ENTRADA" else tipoMovimientoVal
+        val fecha = if (fechaVal.isBlank()) {
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        } else {
+            fechaVal
+        }
 
         val camposFaltantes = mutableListOf<String>()
         if (nombre.isBlank())  camposFaltantes.add("producto")
@@ -33,6 +46,70 @@ object OcrProcessor {
 
     fun parsearQr(qrTexto: String): QrData? {
         if (qrTexto.isBlank() || qrTexto == "Esperando código QR...") return null
+
+        try {
+            val json = JSONObject(qrTexto)
+            fun optString(json: JSONObject, keys: List<String>): String {
+                for (key in keys) {
+                    if (json.has(key)) return json.optString(key)
+                }
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) {
+                        return json.optString(k)
+                    }
+                }
+                return ""
+            }
+
+            fun optInt(json: JSONObject, keys: List<String>): Int {
+                for (key in keys) {
+                    if (json.has(key)) return json.optInt(key)
+                }
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) {
+                        return json.optInt(k)
+                    }
+                }
+                return 0
+            }
+
+            fun optDouble(json: JSONObject, keys: List<String>): Double {
+                for (key in keys) {
+                    if (json.has(key)) return json.optDouble(key)
+                }
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) {
+                        return json.optDouble(k)
+                    }
+                }
+                return 0.0
+            }
+
+            val idCaja = optString(json, listOf("idCaja", "idcaja", "id", "caja"))
+            val nombre = optString(json, listOf("producto", "nombre", "item"))
+            val cantidad = optInt(json, listOf("cantidad", "qty", "unidades"))
+            val destino = optString(json, listOf("destino", "destination", "para"))
+            val pesoKg = optDouble(json, listOf("peso", "pesoKg", "kg", "weight"))
+            val categoria = optString(json, listOf("categoria", "category", "tipo"))
+            val tipoMovimiento = optString(json, listOf("movimiento", "movement", "tipo_mov"))
+            val fecha = optString(json, listOf("fecha", "date"))
+
+            return QrData(
+                idCaja         = idCaja,
+                nombre         = nombre,
+                cantidad       = cantidad,
+                destino        = destino,
+                pesoKg         = pesoKg,
+                categoria      = categoria,
+                tipoMovimiento = tipoMovimiento,
+                fecha          = fecha
+            )
+        } catch (e: Exception) {
+            // Fallback to lines parsing
+        }
 
         val lineas = qrTexto.lines().map { it.trim() }.filter { it.isNotBlank() }
 
