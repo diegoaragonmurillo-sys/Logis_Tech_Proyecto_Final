@@ -32,15 +32,8 @@ fun GestionCajaScreen(
     val rol = SessionManager.rol
     var caja by remember { mutableStateOf<Caja?>(null) }
     var cajaEncontrada by remember { mutableStateOf<Boolean?>(null) }
-
-    var selectedUbicacionId by remember { mutableStateOf("") }
-    var expandedUbicaciones by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var estadoAConfirmar by remember { mutableStateOf("") }
-    var showAddUbicDialog by remember { mutableStateOf(false) }
-    var nuevoPasillo by remember { mutableStateOf("") }
-    var nuevoEstante by remember { mutableStateOf("") }
-    var nuevoNivel by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         try {
@@ -54,28 +47,20 @@ fun GestionCajaScreen(
         } catch (e: Exception) {
             cajaEncontrada = false
         }
-
-        if (rol == SessionManager.Rol.BANDA) {
-            viewModel.loadInitialData()
-        }
     }
 
-    // Diálogo de confirmación
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Confirmar Acción") },
-            text = { Text("¿Deseas cambiar la caja $codigoQr al estado ${estadoAConfirmar.replace("_", " ")}?") },
+            title = { Text("Confirmar acción") },
+            text = {
+                Text("¿Cambiar la caja $codigoQr al estado ${estadoAConfirmar.replace("_", " ")}?")
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         showConfirmDialog = false
-                        viewModel.cambiarEstado(
-                            codigoQr,
-                            estadoAConfirmar,
-                            if (estadoAConfirmar == "EN_ESTANTE") selectedUbicacionId else null,
-                            onSuccess
-                        )
+                        viewModel.cambiarEstado(codigoQr, estadoAConfirmar, null, onSuccess)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2980B9))
                 ) { Text("CONFIRMAR") }
@@ -83,31 +68,6 @@ fun GestionCajaScreen(
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) { Text("CANCELAR") }
             }
-        )
-    }
-
-    // Diálogo agregar ubicación
-    if (showAddUbicDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddUbicDialog = false },
-            title = { Text("Nueva Ubicación") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = nuevoPasillo, onValueChange = { nuevoPasillo = it }, label = { Text("Pasillo (ej: P1)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = nuevoEstante, onValueChange = { nuevoEstante = it }, label = { Text("Estante (ej: 1)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = nuevoNivel, onValueChange = { nuevoNivel = it }, label = { Text("Nivel (ej: 1)") }, modifier = Modifier.fillMaxWidth())
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    val coord = "$nuevoPasillo-E$nuevoEstante-N$nuevoNivel"
-                    viewModel.registrarUbicacion(coord, nuevoPasillo, nuevoEstante.toIntOrNull() ?: 0, nuevoNivel.toIntOrNull() ?: 0) {
-                        showAddUbicDialog = false
-                        nuevoPasillo = ""; nuevoEstante = ""; nuevoNivel = ""
-                    }
-                }) { Text("CREAR") }
-            },
-            dismissButton = { TextButton(onClick = { showAddUbicDialog = false }) { Text("CANCELAR") } }
         )
     }
 
@@ -127,7 +87,6 @@ fun GestionCajaScreen(
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (cajaEncontrada) {
 
-                // ── Caja no encontrada ────────────────────────────────────────
                 false -> {
                     Column(
                         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -148,9 +107,10 @@ fun GestionCajaScreen(
                     }
                 }
 
-                // ── Caja encontrada ───────────────────────────────────────────
                 true -> {
                     val cajaData = caja
+                    val estadoActual = cajaData?.estado ?: ""
+
                     Column(
                         modifier = Modifier
                             .padding(16.dp)
@@ -158,7 +118,7 @@ fun GestionCajaScreen(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Info de la caja
+                        // ── Info de la caja ───────────────────────────
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF3FB))
@@ -171,94 +131,78 @@ fun GestionCajaScreen(
                                     InfoRow("Producto", cajaData.producto)
                                     InfoRow("Cantidad", cajaData.cantidad.toString())
                                     InfoRow("Peso", "${cajaData.peso_kg} kg")
-                                    InfoRow("Estado actual", cajaData.estado.replace("_", " "))
-                                    if (!cajaData.id_ubicacion.isNullOrBlank()) {
-                                        InfoRow("Ubicación", cajaData.id_ubicacion)
-                                    }
+                                    InfoRow("Estado actual", estadoActual.replace("_", " "))
                                 }
                             }
                         }
 
+                        // ── Badge estado con color ────────────────────
+                        EstadoBadge(estadoActual)
+
                         HorizontalDivider()
 
                         when (rol) {
-                            // ── RECEPTOR: solo puede confirmar ingreso ────────
+                            // ── RECEPTOR ─────────────────────────────
                             SessionManager.Rol.RECEPTOR -> {
-                                Text("Acción disponible", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Confirmar Recepción", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        Spacer(Modifier.height(4.dp))
-                                        Text("Valida el ingreso físico al almacén.", color = Color.Gray, fontSize = 13.sp)
+                                if (estadoActual == "REGISTRADO") {
+                                    Text("Acción disponible", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    if (viewModel.isLoading) {
+                                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                                    } else {
+                                        EstadoBoton("CONFIRMAR RECEPCIÓN", Color(0xFF2980B9)) {
+                                            estadoAConfirmar = "RECEPCION_EN_ALMACEN"
+                                            showConfirmDialog = true
+                                        }
                                     }
-                                }
-                                if (viewModel.isLoading) {
-                                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                                 } else {
-                                    Button(
-                                        onClick = { estadoAConfirmar = "RECEPCION_EN_ALMACEN"; showConfirmDialog = true },
-                                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2980B9))
-                                    ) { Text("CONFIRMAR INGRESO") }
+                                    MensajeInfo("Esta caja ya fue recibida y está en estado: ${estadoActual.replace("_", " ")}")
                                 }
                             }
 
-                            // ── BANDA: puede mover la caja por todos los estados
+                            // ── BANDA ─────────────────────────────────
                             SessionManager.Rol.BANDA -> {
                                 Text("Acciones de Banda", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-
-                                // Selector de ubicación para EN_ESTANTE
-                                ExposedDropdownMenuBox(
-                                    expanded = expandedUbicaciones,
-                                    onExpandedChange = { expandedUbicaciones = !expandedUbicaciones }
-                                ) {
-                                    OutlinedTextField(
-                                        value = if (selectedUbicacionId.isEmpty()) "Seleccionar Ubicación (para estante)" else selectedUbicacionId,
-                                        onValueChange = {}, readOnly = true,
-                                        label = { Text("Coordenada Física") },
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedUbicaciones) },
-                                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = expandedUbicaciones,
-                                        onDismissRequest = { expandedUbicaciones = false }
-                                    ) {
-                                        viewModel.ubicacionesDisponibles.forEach { ubic ->
-                                            DropdownMenuItem(
-                                                text = { Text(ubic.id_coordenada) },
-                                                onClick = { selectedUbicacionId = ubic.id_coordenada; expandedUbicaciones = false }
-                                            )
-                                        }
-                                        HorizontalDivider()
-                                        DropdownMenuItem(
-                                            text = { Text("+ Nueva Ubicación...", color = Color(0xFF2980B9), fontWeight = FontWeight.Bold) },
-                                            onClick = { expandedUbicaciones = false; showAddUbicDialog = true }
-                                        )
-                                    }
-                                }
 
                                 if (viewModel.isLoading) {
                                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                                 } else {
-                                    // Botones para cada estado posible
-                                    EstadoBoton("RECEPCION EN ALMACEN", Color(0xFFF59E0B)) {
-                                        estadoAConfirmar = "RECEPCION_EN_ALMACEN"; showConfirmDialog = true
-                                    }
-                                    EstadoBoton("UBICAR EN ESTANTE", Color(0xFF10B981), enabled = selectedUbicacionId.isNotBlank()) {
-                                        estadoAConfirmar = "EN_ESTANTE"; showConfirmDialog = true
-                                    }
-                                    EstadoBoton("SALIDA DE ESTANTE", Color(0xFF8B5CF6)) {
-                                        estadoAConfirmar = "SALIDA_DE_ESTANTE"; showConfirmDialog = true
-                                    }
-                                    EstadoBoton("SALIENDO DE ALMACEN", Color(0xFFEC4899)) {
-                                        estadoAConfirmar = "SALIENDO_DE_ALMACEN"; showConfirmDialog = true
-                                    }
-                                    EstadoBoton("MARCAR ENTREGADO", Color(0xFF64748B)) {
-                                        estadoAConfirmar = "ENTREGADO"; showConfirmDialog = true
+                                    // Mostrar solo el siguiente paso lógico según estado actual
+                                    when (estadoActual) {
+                                        "REGISTRADO" -> {
+                                            MensajeInfo("El receptor aún no confirmó la recepción.")
+                                        }
+                                        "RECEPCION_EN_ALMACEN" -> {
+                                            // Entrada — la caja acaba de llegar al almacén
+                                            EstadoBoton("CONFIRMAR EN ESTANTE", Color(0xFF10B981)) {
+                                                estadoAConfirmar = "EN_ESTANTE"
+                                                showConfirmDialog = true
+                                            }
+                                        }
+                                        "EN_ESTANTE" -> {
+                                            // La caja está en almacén, banda la prepara para salida
+                                            EstadoBoton("PREPARAR SALIDA", Color(0xFF8B5CF6)) {
+                                                estadoAConfirmar = "SALIDA_DE_ESTANTE"
+                                                showConfirmDialog = true
+                                            }
+                                        }
+                                        "SALIDA_DE_ESTANTE" -> {
+                                            EstadoBoton("CONFIRMAR SALIDA DE ALMACÉN", Color(0xFFEC4899)) {
+                                                estadoAConfirmar = "SALIENDO_DE_ALMACEN"
+                                                showConfirmDialog = true
+                                            }
+                                        }
+                                        "SALIENDO_DE_ALMACEN" -> {
+                                            EstadoBoton("MARCAR COMO ENTREGADO", Color(0xFF64748B)) {
+                                                estadoAConfirmar = "ENTREGADO"
+                                                showConfirmDialog = true
+                                            }
+                                        }
+                                        "ENTREGADO" -> {
+                                            MensajeInfo("✓ Esta caja ya fue entregada exitosamente.")
+                                        }
+                                        else -> {
+                                            MensajeInfo("Estado desconocido: $estadoActual")
+                                        }
                                     }
                                 }
                             }
@@ -266,7 +210,6 @@ fun GestionCajaScreen(
                     }
                 }
 
-                // ── Cargando ──────────────────────────────────────────────────
                 null -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -279,6 +222,48 @@ fun GestionCajaScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EstadoBadge(estado: String) {
+    val color = when (estado) {
+        "REGISTRADO"            -> Color(0xFF3B82F6)
+        "RECEPCION_EN_ALMACEN"  -> Color(0xFFF59E0B)
+        "EN_ESTANTE"            -> Color(0xFF10B981)
+        "SALIDA_DE_ESTANTE"     -> Color(0xFF8B5CF6)
+        "SALIENDO_DE_ALMACEN"   -> Color(0xFFEC4899)
+        "ENTREGADO"             -> Color(0xFF64748B)
+        else                    -> Color.Gray
+    }
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = "→ Siguiente acción requerida",
+            fontSize = 12.sp,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun MensajeInfo(texto: String) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F4F8))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Info, null, tint = Color(0xFF2980B9), modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(texto, fontSize = 14.sp, color = Color(0xFF1E293B))
         }
     }
 }
