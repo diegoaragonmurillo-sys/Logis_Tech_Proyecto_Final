@@ -21,6 +21,8 @@ import com.example.logist_tech.ocr.OcrProcessor
 import com.example.logist_tech.scanner.ScannerResultHolder
 import com.example.logist_tech.ui.viewmodels.LogistViewModel
 
+private val REGEX_ID_CAJA = Regex("^CJ-\\d{4}$")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegistroCajaScreen(
@@ -41,8 +43,18 @@ fun RegistroCajaScreen(
     }
 
     // ── Lógica del ID ─────────────────────────────────────────────────
-    // Prioridad: idCaja del QR > ID en texto del QR > OCR > vacío
-    val idDesdeQr  = qrData?.idCaja?.ifBlank { codigoQr.ifBlank { "" } } ?: codigoQr.ifBlank { "" }
+    // Prioridad: idCaja del QR (si formato válido) > codigoQr directo (si formato válido) > OCR > vacío
+    val idDesdeQr = remember(codigoQr, qrData) {
+        when {
+            // El JSON fue parseado y tiene idCaja válido
+            qrData?.idCaja?.matches(REGEX_ID_CAJA) == true -> qrData.idCaja
+            // El codigoQr en sí ya es un ID válido (escaneó solo el código, no JSON)
+            codigoQr.matches(REGEX_ID_CAJA)                -> codigoQr
+            // El QR tenía JSON pero sin idCaja válido — no usar el JSON raw
+            else                                           -> ""
+        }
+    }
+
     val idDesdeOcr = remember(ocrTexto) {
         if (ocrTexto.isNotBlank()) OcrProcessor.extraerIdDeTexto(ocrTexto) else ""
     }
@@ -58,7 +70,7 @@ fun RegistroCajaScreen(
     }
 
     // Válido si cumple formato CJ-XXXX (exactamente 4 dígitos)
-    val codigoValido = Regex("^CJ-\\d{4}$").matches(codigoEditable)
+    val codigoValido = REGEX_ID_CAJA.matches(codigoEditable)
 
     // ── Campos del formulario — QR tiene prioridad sobre OCR ──────────
     var producto by remember {
@@ -125,15 +137,15 @@ fun RegistroCajaScreen(
     val fuenteDatos = if (qrData != null) "QR" else "OCR"
     val camposPreLlenados = remember(qrData, ocrData) {
         buildList {
-            if (idDesdeQr.isNotBlank() || idDesdeOcr.isNotBlank())                         add("ID")
-            if (!qrData?.nombre.isNullOrBlank() || !ocrData?.nombre.isNullOrBlank())        add("Producto")
-            if ((qrData?.cantidad ?: 0) > 0 || (ocrData?.cantidad ?: 0) > 0)               add("Cantidad")
-            if ((qrData?.pesoKg ?: 0.0) > 0.0 || (ocrData?.pesoKg ?: 0.0) > 0.0)          add("Peso")
-            if (!qrData?.categoria.isNullOrBlank() || !ocrData?.categoria.isNullOrBlank())  add("Categoría")
-            if (!qrData?.prioridad.isNullOrBlank() || !ocrData?.prioridad.isNullOrBlank())  add("Prioridad")
-            if (!qrData?.idProveedor.isNullOrBlank() || !ocrData?.idProveedor.isNullOrBlank()) add("Proveedor")
-            if (!qrData?.idTipoCaja.isNullOrBlank() || !ocrData?.idTipoCaja.isNullOrBlank()) add("Tipo Caja")
-            if ((qrData?.esFragil ?: ocrData?.esFragil ?: 0) == 1)                         add("Frágil")
+            if (idDesdeQr.isNotBlank() || idDesdeOcr.isNotBlank())                             add("ID")
+            if (!qrData?.nombre.isNullOrBlank() || !ocrData?.nombre.isNullOrBlank())            add("Producto")
+            if ((qrData?.cantidad ?: 0) > 0 || (ocrData?.cantidad ?: 0) > 0)                   add("Cantidad")
+            if ((qrData?.pesoKg ?: 0.0) > 0.0 || (ocrData?.pesoKg ?: 0.0) > 0.0)              add("Peso")
+            if (!qrData?.categoria.isNullOrBlank() || !ocrData?.categoria.isNullOrBlank())      add("Categoría")
+            if (!qrData?.prioridad.isNullOrBlank() || !ocrData?.prioridad.isNullOrBlank())      add("Prioridad")
+            if (!qrData?.idProveedor.isNullOrBlank() || !ocrData?.idProveedor.isNullOrBlank())  add("Proveedor")
+            if (!qrData?.idTipoCaja.isNullOrBlank() || !ocrData?.idTipoCaja.isNullOrBlank())    add("Tipo Caja")
+            if ((qrData?.esFragil ?: ocrData?.esFragil ?: 0) == 1)                             add("Frágil")
         }
     }
 
@@ -262,7 +274,7 @@ fun RegistroCajaScreen(
                         OutlinedTextField(
                             value = codigoEditable,
                             onValueChange = { nuevo ->
-                                // Solo editable si NO vino del QR
+                                // Solo editable si NO vino del QR con formato válido
                                 if (idDesdeQr.isBlank()) {
                                     val sinPrefijo = nuevo
                                         .removePrefix("CJ-")
