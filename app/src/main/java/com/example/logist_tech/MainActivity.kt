@@ -29,6 +29,9 @@ import com.example.logist_tech.ui.screens.DashboardScreen
 import com.example.logist_tech.ui.screens.GlobalHistoryScreen
 import com.example.logist_tech.ui.screens.ReporteScreen
 
+/** Regex para validar formato de ID de caja */
+private val REGEX_ID_CAJA = Regex("^CJ-\\d{4}$")
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,19 +104,28 @@ class MainActivity : ComponentActivity() {
                         composable("scanner") {
                             ScannerScreen(
                                 onNavigarResultado = {
-                                    val qr = ScannerResultHolder.textoQr
+                                    val qr  = ScannerResultHolder.textoQr
                                     val ocr = ScannerResultHolder.textoOcr
 
                                     when {
                                         qr.isNotBlank() -> {
+                                            // Parsear el QR para extraer idCaja del JSON/líneas
                                             val qrData = com.example.logist_tech.ocr.OcrProcessor.parsearQr(qr)
-                                            val idCaja = qrData?.idCaja?.ifBlank { qr } ?: qr
-                                            val encodedQr = Uri.encode(idCaja)
+
+                                            // Usar idCaja solo si tiene formato válido CJ-XXXX
+                                            // Si no, dejar vacío para que RegistroCajaScreen lo maneje
+                                            val idCaja = when {
+                                                qrData?.idCaja?.matches(REGEX_ID_CAJA) == true -> qrData.idCaja
+                                                qr.matches(REGEX_ID_CAJA)                      -> qr
+                                                else                                            -> ""
+                                            }
+
+                                            val encodedId = Uri.encode(idCaja.ifBlank { qr })
 
                                             val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
-                                                "registro_caja/$encodedQr"
+                                                "registro_caja/$encodedId"
                                             else
-                                                "gestion_caja/$encodedQr"
+                                                "gestion_caja/$encodedId"
                                             navController.navigate(destino)
                                         }
 
@@ -122,11 +134,11 @@ class MainActivity : ComponentActivity() {
                                             val idCaja = qrData?.idCaja ?: ""
 
                                             if (idCaja.isNotBlank()) {
-                                                val encodedQr = Uri.encode(idCaja)
+                                                val encodedId = Uri.encode(idCaja)
                                                 val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
-                                                    "registro_caja/$encodedQr"
+                                                    "registro_caja/$encodedId"
                                                 else
-                                                    "gestion_caja/$encodedQr"
+                                                    "gestion_caja/$encodedId"
                                                 navController.navigate(destino)
                                             } else {
                                                 navController.navigate("ocr_result")
