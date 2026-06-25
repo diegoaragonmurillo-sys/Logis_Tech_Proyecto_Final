@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -33,10 +32,15 @@ fun GlobalHistoryScreen(
         viewModel.loadHistorialGlobal()
     }
 
+    // Solo mostrar entradas y salidas
+    val historialFiltrado = viewModel.historialGlobal.filter {
+        it.estado_nuevo == "REGISTRADO" || it.estado_nuevo == "ENTREGADO"
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Línea de Tiempo Global", fontWeight = FontWeight.Bold) },
+                title = { Text("Historial de Entradas y Salidas", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -54,14 +58,17 @@ fun GlobalHistoryScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (viewModel.historialGlobal.isEmpty()) {
+            if (historialFiltrado.isEmpty()) {
                 item {
-                    Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No hay movimientos registrados", color = Color.Gray)
+                    Box(
+                        modifier = Modifier.fillParentMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No hay entradas ni salidas registradas", color = Color.Gray)
                     }
                 }
             }
-            items(viewModel.historialGlobal) { mov ->
+            items(historialFiltrado) { mov ->
                 TimelineItem(mov)
             }
         }
@@ -70,15 +77,9 @@ fun GlobalHistoryScreen(
 
 @Composable
 fun TimelineItem(mov: HistorialMovimiento) {
-    val stateColor = when(mov.estado_nuevo) {
-        "REGISTRADO" -> Color(0xFF1976D2)
-        "RECEPCION_EN_ALMACEN" -> Color(0xFFF57C00)
-        "EN_ESTANTE" -> Color(0xFF388E3C)
-        "SALIDA_DE_ESTANTE" -> Color(0xFF7B1FA2)
-        "SALIENDO_DE_ALMACEN" -> Color(0xFFE91E63)
-        "ENTREGADO" -> Color(0xFF455A64)
-        else -> Color.Gray
-    }
+    val esEntrada = mov.estado_nuevo == "REGISTRADO"
+    val stateColor = if (esEntrada) Color(0xFF1976D2) else Color(0xFF455A64)
+    val label = if (esEntrada) "ENTRADA" else "SALIDA"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -96,19 +97,30 @@ fun TimelineItem(mov: HistorialMovimiento) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = mov.estado_nuevo.replace("_", " "),
-                        color = stateColor,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 12.sp,
-                        letterSpacing = 1.sp
-                    )
+                    // Badge ENTRADA / SALIDA
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = stateColor.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            text = label,
+                            color = stateColor,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
-                    Text(text = if(mov.fecha_cambio.length > 10) mov.fecha_cambio.takeLast(8) else "", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        text = if (mov.fecha_cambio.length > 10) mov.fecha_cambio.takeLast(8) else "",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 Text(
                     text = mov.producto.ifBlank { "Caja: ${mov.id_caja}" },
                     fontSize = 18.sp,
@@ -116,15 +128,29 @@ fun TimelineItem(mov: HistorialMovimiento) {
                     color = Color(0xFF1A1C1E)
                 )
 
+                Text(
+                    text = "ID: ${mov.id_caja}",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
-                    Text(text = "${mov.id_operador} • ${mov.tipo_operador}", fontSize = 13.sp, color = Color.DarkGray)
+                    Text(
+                        text = "${mov.id_operador} • ${mov.tipo_operador}",
+                        fontSize = 13.sp,
+                        color = Color.DarkGray
+                    )
                 }
-                
-                Text(text = mov.fecha_cambio.take(10), fontSize = 11.sp, color = Color.LightGray)
+
+                Text(
+                    text = mov.fecha_cambio.take(10),
+                    fontSize = 11.sp,
+                    color = Color.LightGray
+                )
             }
         }
     }
