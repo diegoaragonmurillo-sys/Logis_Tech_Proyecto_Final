@@ -21,6 +21,9 @@ import com.example.logist_tech.network.RetrofitClient
 import com.example.logist_tech.ocr.OcrProcessor
 import com.example.logist_tech.scanner.ScannerResultHolder
 import com.example.logist_tech.ui.viewmodels.LogistViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +37,12 @@ fun RegistroCajaScreen(
     val ocrTexto = ScannerResultHolder.textoOcr
     val ocrData  = remember(ocrTexto) {
         if (ocrTexto.isNotBlank()) OcrProcessor.parsearTextoOcr(ocrTexto) else null
+    }
+
+    val codigoFinal = remember {
+        codigoQr.ifBlank {
+            "CJ-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())
+        }
     }
 
     var producto    by remember { mutableStateOf(ocrData?.nombre    ?: "") }
@@ -68,7 +77,7 @@ fun RegistroCajaScreen(
         try {
             val response = RetrofitClient.api.getTodasLasCajas()
             if (response.isSuccessful) {
-                cajaYaExiste = response.body()?.any { it.codigo_qr == codigoQr } ?: false
+                cajaYaExiste = response.body()?.any { it.codigo_qr == codigoFinal } ?: false
             } else {
                 cajaYaExiste = false
             }
@@ -136,7 +145,7 @@ fun RegistroCajaScreen(
                         Spacer(Modifier.height(16.dp))
                         Text("REGISTRO DUPLICADO", color = Color(0xFFF57F17), fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
                         Spacer(Modifier.height(8.dp))
-                        Text("La caja \"$codigoQr\" ya está registrada en el sistema.", textAlign = TextAlign.Center, color = Color.DarkGray)
+                        Text("La caja \"$codigoFinal\" ya está registrada en el sistema.", textAlign = TextAlign.Center, color = Color.DarkGray)
                         Spacer(Modifier.height(32.dp))
                         Button(
                             onClick = onBack,
@@ -161,8 +170,8 @@ fun RegistroCajaScreen(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF3FB))
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Código QR detectado", fontSize = 11.sp, color = Color.Gray)
-                                Text(codigoQr, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2980B9))
+                                Text("ID generado automáticamente", fontSize = 11.sp, color = Color.Gray)
+                                Text(codigoFinal, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2980B9))
                             }
                         }
 
@@ -271,7 +280,7 @@ fun RegistroCajaScreen(
                             Button(
                                 onClick = {
                                     viewModel.registrarCaja(
-                                        codigoQr,
+                                        codigoFinal,
                                         producto,
                                         cantidad.toIntOrNull() ?: 1,
                                         peso.toDoubleOrNull() ?: 0.0,
