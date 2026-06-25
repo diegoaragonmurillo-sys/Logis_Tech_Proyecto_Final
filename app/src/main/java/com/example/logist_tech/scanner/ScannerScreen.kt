@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,43 +30,33 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.logist_tech.auth.SessionManager
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import kotlinx.coroutines.delay
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 enum class ScanMode { QR, OCR_FOTO }
 
-private const val QR_TIMEOUT_SECONDS = 8
-
 @Composable
 fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val rol = SessionManager.rol
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
 
     var hasCameraPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
 
+    // Ambos roles empiezan en QR y pueden cambiar manualmente
     var scanMode by remember { mutableStateOf(ScanMode.QR) }
-    var qrTimeoutAlcanzado by remember { mutableStateOf(false) }
-    var secondsWaiting by remember { mutableStateOf(0) }
-    var reintentoKey by remember { mutableStateOf(0) } // ← trigger para reiniciar timeout
-
     var imageCaptureUseCase by remember { mutableStateOf<ImageCapture?>(null) }
     var procesandoFoto by remember { mutableStateOf(false) }
     var mensajeFoto by remember { mutableStateOf<String?>(null) }
-
     var showManualDialog by remember { mutableStateOf(false) }
     var manualText by remember { mutableStateOf("") }
 
@@ -83,29 +71,14 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
         ScannerResultHolder.imagenBitmap = null
     }
 
-    // ← ahora usa reintentoKey además de scanMode para poder reiniciarse
-    LaunchedEffect(scanMode, reintentoKey) {
-        if (scanMode == ScanMode.QR) {
-            secondsWaiting = 0
-            qrTimeoutAlcanzado = false
-            repeat(QR_TIMEOUT_SECONDS) {
-                delay(1000)
-                secondsWaiting++
-            }
-            if (scanMode == ScanMode.QR) {
-                qrTimeoutAlcanzado = true
-            }
-        }
-    }
-
     if (showManualDialog) {
         AlertDialog(
             onDismissRequest = { showManualDialog = false },
-            title = { Text(if (!qrTimeoutAlcanzado) "Ingresar código QR" else "Ingresar texto OCR") },
+            title = { Text(if (scanMode == ScanMode.QR) "Ingresar código QR" else "Ingresar texto OCR") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = if (!qrTimeoutAlcanzado)
+                        text = if (scanMode == ScanMode.QR)
                             "Escribe el código de la caja (ej: CJ-001)"
                         else
                             "Escribe el texto del formulario:\nID: CJ-001\nProducto: Laptop\nCantidad: 5\nPeso: 1.5",
@@ -117,8 +90,8 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                         onValueChange = { manualText = it },
                         label = { Text("Contenido") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = !qrTimeoutAlcanzado,
-                        minLines = if (qrTimeoutAlcanzado) 4 else 1
+                        singleLine = scanMode == ScanMode.QR,
+                        minLines = if (scanMode == ScanMode.OCR_FOTO) 4 else 1
                     )
                 }
             },
@@ -126,7 +99,7 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                 Button(onClick = {
                     if (manualText.isNotBlank()) {
                         showManualDialog = false
-                        if (!qrTimeoutAlcanzado) {
+                        if (scanMode == ScanMode.QR) {
                             ScannerResultHolder.textoQr = manualText
                         } else {
                             ScannerResultHolder.textoOcr = manualText
@@ -165,43 +138,36 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
 
             Box(modifier = Modifier.fillMaxSize()) {
 
-                // Toggle BANDA
-                if (rol == SessionManager.Rol.BANDA) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(top = 48.dp, start = 16.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        listOf(ScanMode.QR to "QR", ScanMode.OCR_FOTO to "OCR").forEach { (mode, label) ->
-                            val selected = scanMode == mode
-                            Button(
-                                onClick = {
-                                    if (!selected) {
-                                        scanMode = mode
-                                        qrTimeoutAlcanzado = mode == ScanMode.OCR_FOTO
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (selected) Color(0xFF2980B9) else Color.Transparent
-                                ),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                                elevation = ButtonDefaults.buttonElevation(0.dp)
-                            ) {
-                                Text(
-                                    label,
-                                    color = Color.White,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 13.sp
-                                )
-                            }
+                // Toggle QR/OCR — AMBOS roles lo ven
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(top = 48.dp, start = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(ScanMode.QR to "QR", ScanMode.OCR_FOTO to "OCR / Foto").forEach { (mode, label) ->
+                        val selected = scanMode == mode
+                        Button(
+                            onClick = { scanMode = mode; mensajeFoto = null },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) Color(0xFF2980B9) else Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                            elevation = ButtonDefaults.buttonElevation(0.dp)
+                        ) {
+                            Text(
+                                label,
+                                color = Color.White,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
 
-                // Botón manual
+                // Botón manual — discreto arriba derecha
                 IconButton(
                     onClick = { showManualDialog = true },
                     modifier = Modifier
@@ -213,94 +179,62 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                 }
 
                 // Marco de enfoque
-                val modoFoto = scanMode == ScanMode.OCR_FOTO || qrTimeoutAlcanzado
                 Box(
                     modifier = Modifier
-                        .size(if (modoFoto) 300.dp else 260.dp)
+                        .size(if (scanMode == ScanMode.OCR_FOTO) 300.dp else 260.dp)
                         .align(Alignment.Center)
                         .border(
                             2.dp,
-                            if (modoFoto) Color(0xFF60A5FA) else Color.White.copy(alpha = 0.7f),
+                            if (scanMode == ScanMode.OCR_FOTO) Color(0xFF60A5FA) else Color.White.copy(alpha = 0.7f),
                             RoundedCornerShape(16.dp)
                         )
                 )
 
-                // Aviso timeout
-                AnimatedVisibility(
-                    visible = qrTimeoutAlcanzado && scanMode == ScanMode.QR,
-                    modifier = Modifier.align(Alignment.Center).offset(y = (-160).dp)
-                ) {
-                    Text(
-                        "No se detectó QR",
-                        color = Color(0xFF60A5FA),
-                        fontSize = 13.sp,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-
-                // Countdown
-                AnimatedVisibility(
-                    visible = !qrTimeoutAlcanzado && scanMode == ScanMode.QR && secondsWaiting > 0,
-                    modifier = Modifier.align(Alignment.Center).offset(y = 150.dp)
-                ) {
-                    Text(
-                        "Buscando QR (${QR_TIMEOUT_SECONDS - secondsWaiting}s)...",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 12.sp
-                    )
-                }
-
-                // Botones de foto
-                if (qrTimeoutAlcanzado || scanMode == ScanMode.OCR_FOTO) {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 60.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        mensajeFoto?.let {
-                            Text(
-                                it,
-                                color = if (it.startsWith("✓")) Color(0xFF10B981) else Color(0xFFEF4444),
-                                fontSize = 13.sp,
-                                modifier = Modifier
-                                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-
+                // Contenido inferior según modo
+                when (scanMode) {
+                    ScanMode.QR -> {
                         Text(
-                            "Encuadra el formulario y toma la foto",
+                            "Apunta al código QR del formulario o la caja",
                             color = Color.White,
-                            fontSize = 13.sp,
                             textAlign = TextAlign.Center,
+                            fontSize = 13.sp,
                             modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 48.dp)
                                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
+                    }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            // Reintentar QR — ahora usa reintentoKey++
-                            if (qrTimeoutAlcanzado && scanMode == ScanMode.QR) {
-                                OutlinedButton(
-                                    onClick = {
-                                        mensajeFoto = null
-                                        reintentoKey++ // ← esto dispara el LaunchedEffect de nuevo
-                                    },
-                                    shape = RoundedCornerShape(50.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
-                                ) {
-                                    Icon(Icons.Default.Replay, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Reintentar QR")
-                                }
+                    ScanMode.OCR_FOTO -> {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            mensajeFoto?.let {
+                                Text(
+                                    it,
+                                    color = if (it.startsWith("✓")) Color(0xFF10B981) else Color(0xFFEF4444),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier
+                                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
                             }
 
-                            // Tomar foto
+                            Text(
+                                "Encuadra el formulario y toma la foto",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+
                             if (procesandoFoto) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(52.dp))
                             } else {
@@ -336,21 +270,8 @@ fun ScannerScreen(onNavigarResultado: () -> Unit = {}) {
                             }
                         }
                     }
-                } else {
-                    Text(
-                        "Apunta al código QR del formulario o la caja",
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        fontSize = 13.sp,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 48.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
                 }
             }
-
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
@@ -466,9 +387,7 @@ private fun tomarFotoYProcesarOCR(
     onTextoExtraido: (String) -> Unit,
     onError: () -> Unit
 ) {
-    val textRecognizer = TextRecognition.getClient(
-        com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
-    )
+    val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     imageCapture.takePicture(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageCapturedCallback() {
@@ -486,7 +405,6 @@ private fun tomarFotoYProcesarOCR(
                         .addOnFailureListener {
                             image.close()
                             textRecognizer.close()
-                            Log.e("OCR_FOTO", "Error OCR", it)
                             onError()
                         }
                 } else {
