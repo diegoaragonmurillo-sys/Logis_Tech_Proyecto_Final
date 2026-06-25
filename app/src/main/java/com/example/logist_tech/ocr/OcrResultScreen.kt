@@ -24,7 +24,8 @@ fun OcrResultScreen(
     textoOcr: String,
     textoQr: String,
     imagenCapturada: Bitmap? = null,
-    onRegistrarEnInventario: () -> Unit = {}
+    onRegistrarEnInventario: () -> Unit = {},
+    onVolver: () -> Unit = {}
 ) {
     val esEscaneoQr = textoOcr.isBlank() && textoQr.isNotBlank()
 
@@ -54,6 +55,8 @@ fun OcrResultScreen(
         .orEmpty().ifBlank { "No especificado" }
 
     val fechaMostrar = "Se genera al registrar"
+
+    val datosLegibles = !esEscaneoQr && ocrData.nombre.isNotBlank() && ocrData.cantidad > 0
 
     Column(
         modifier = Modifier
@@ -97,8 +100,19 @@ fun OcrResultScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        if (datosLegibles) {
+            Button(
+                onClick  = { onRegistrarEnInventario() },
+                modifier = Modifier.fillMaxWidth(),
+                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Text("Registrar en Inventario", color = Color.White)
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+
         Button(
-            onClick  = { onRegistrarEnInventario() },
+            onClick  = { onVolver() },
             modifier = Modifier.fillMaxWidth(),
             colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2980B9))
         ) {

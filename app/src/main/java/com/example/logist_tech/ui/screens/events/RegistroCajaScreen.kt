@@ -17,7 +17,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.logist_tech.network.RetrofitClient
 import com.example.logist_tech.ocr.OcrProcessor
 import com.example.logist_tech.scanner.ScannerResultHolder
 import com.example.logist_tech.ui.viewmodels.LogistViewModel
@@ -36,9 +35,14 @@ fun RegistroCajaScreen(
         if (ocrTexto.isNotBlank()) OcrProcessor.parsearTextoOcr(ocrTexto) else null
     }
 
+    // ── Datos desde QR (JSON o líneas) ───────────────────────────────
+    val qrData = remember(codigoQr) {
+        if (codigoQr.isNotBlank()) OcrProcessor.parsearQr(codigoQr) else null
+    }
+
     // ── Lógica del ID ─────────────────────────────────────────────────
-    // Prioridad: QR > OCR (campo ID en la hoja) > vacío (receptor escribe)
-    val idDesdeQr  = codigoQr.ifBlank { "" }
+    // Prioridad: idCaja del QR > ID en texto del QR > OCR > vacío
+    val idDesdeQr  = qrData?.idCaja?.ifBlank { codigoQr.ifBlank { "" } } ?: codigoQr.ifBlank { "" }
     val idDesdeOcr = remember(ocrTexto) {
         if (ocrTexto.isNotBlank()) OcrProcessor.extraerIdDeTexto(ocrTexto) else ""
     }
@@ -56,29 +60,80 @@ fun RegistroCajaScreen(
     // Válido si cumple formato CJ-XXXX (exactamente 4 dígitos)
     val codigoValido = Regex("^CJ-\\d{4}$").matches(codigoEditable)
 
-    // ── Campos del formulario ─────────────────────────────────────────
-    var producto    by remember { mutableStateOf(ocrData?.nombre?.ifBlank { "" } ?: "") }
-    var cantidad    by remember { mutableStateOf(if ((ocrData?.cantidad ?: 0) > 0) ocrData!!.cantidad.toString() else "1") }
-    var peso        by remember { mutableStateOf(if ((ocrData?.pesoKg ?: 0.0) > 0.0) ocrData!!.pesoKg.toString() else "0.5") }
-    var categoria   by remember { mutableStateOf(ocrData?.categoria?.ifBlank { "GENERAL" } ?: "GENERAL") }
-    var prioridad   by remember { mutableStateOf(ocrData?.prioridad?.ifBlank { "NORMAL" } ?: "NORMAL") }
-    var esFragil    by remember { mutableStateOf((ocrData?.esFragil ?: 0) == 1) }
-    var idProveedor by remember { mutableStateOf(ocrData?.idProveedor?.ifBlank { "PROV-001" } ?: "PROV-001") }
-    var selectedTipoId  by remember { mutableStateOf(ocrData?.idTipoCaja ?: "") }
-    var expandedTipos   by remember { mutableStateOf(false) }
+    // ── Campos del formulario — QR tiene prioridad sobre OCR ──────────
+    var producto by remember {
+        mutableStateOf(
+            qrData?.nombre?.ifBlank { null }
+                ?: ocrData?.nombre?.ifBlank { null }
+                ?: ""
+        )
+    }
+    var cantidad by remember {
+        mutableStateOf(
+            when {
+                (qrData?.cantidad ?: 0) > 0  -> qrData!!.cantidad.toString()
+                (ocrData?.cantidad ?: 0) > 0 -> ocrData!!.cantidad.toString()
+                else                          -> "1"
+            }
+        )
+    }
+    var peso by remember {
+        mutableStateOf(
+            when {
+                (qrData?.pesoKg ?: 0.0) > 0.0  -> qrData!!.pesoKg.toString()
+                (ocrData?.pesoKg ?: 0.0) > 0.0 -> ocrData!!.pesoKg.toString()
+                else                             -> "0.5"
+            }
+        )
+    }
+    var categoria by remember {
+        mutableStateOf(
+            (qrData?.categoria?.ifBlank { null }
+                ?: ocrData?.categoria?.ifBlank { null }
+                ?: "GENERAL").uppercase()
+        )
+    }
+    var prioridad by remember {
+        mutableStateOf(
+            qrData?.prioridad?.ifBlank { null }
+                ?: ocrData?.prioridad?.ifBlank { null }
+                ?: "NORMAL"
+        )
+    }
+    var esFragil by remember {
+        mutableStateOf(
+            (qrData?.esFragil ?: ocrData?.esFragil ?: 0) == 1
+        )
+    }
+    var idProveedor by remember {
+        mutableStateOf(
+            qrData?.idProveedor?.ifBlank { null }
+                ?: ocrData?.idProveedor?.ifBlank { null }
+                ?: "PROV-001"
+        )
+    }
+    var selectedTipoId by remember {
+        mutableStateOf(
+            qrData?.idTipoCaja?.ifBlank { null }
+                ?: ocrData?.idTipoCaja?.ifBlank { null }
+                ?: ""
+        )
+    }
+    var expandedTipos by remember { mutableStateOf(false) }
 
     // ── Badge campos pre-llenados ─────────────────────────────────────
-    val camposPreLlenados = remember(ocrData) {
+    val fuenteDatos = if (qrData != null) "QR" else "OCR"
+    val camposPreLlenados = remember(qrData, ocrData) {
         buildList {
-            if (idDesdeOcr.isNotBlank())                    add("ID")
-            if (!ocrData?.nombre.isNullOrBlank())           add("Producto")
-            if ((ocrData?.cantidad ?: 0) > 0)               add("Cantidad")
-            if ((ocrData?.pesoKg ?: 0.0) > 0.0)             add("Peso")
-            if (!ocrData?.categoria.isNullOrBlank())        add("Categoría")
-            if (!ocrData?.prioridad.isNullOrBlank())        add("Prioridad")
-            if (!ocrData?.idProveedor.isNullOrBlank())      add("Proveedor")
-            if (!ocrData?.idTipoCaja.isNullOrBlank())       add("Tipo Caja")
-            if ((ocrData?.esFragil ?: 0) == 1)              add("Frágil")
+            if (idDesdeQr.isNotBlank() || idDesdeOcr.isNotBlank())                         add("ID")
+            if (!qrData?.nombre.isNullOrBlank() || !ocrData?.nombre.isNullOrBlank())        add("Producto")
+            if ((qrData?.cantidad ?: 0) > 0 || (ocrData?.cantidad ?: 0) > 0)               add("Cantidad")
+            if ((qrData?.pesoKg ?: 0.0) > 0.0 || (ocrData?.pesoKg ?: 0.0) > 0.0)          add("Peso")
+            if (!qrData?.categoria.isNullOrBlank() || !ocrData?.categoria.isNullOrBlank())  add("Categoría")
+            if (!qrData?.prioridad.isNullOrBlank() || !ocrData?.prioridad.isNullOrBlank())  add("Prioridad")
+            if (!qrData?.idProveedor.isNullOrBlank() || !ocrData?.idProveedor.isNullOrBlank()) add("Proveedor")
+            if (!qrData?.idTipoCaja.isNullOrBlank() || !ocrData?.idTipoCaja.isNullOrBlank()) add("Tipo Caja")
+            if ((qrData?.esFragil ?: ocrData?.esFragil ?: 0) == 1)                         add("Frágil")
         }
     }
 
@@ -90,19 +145,28 @@ fun RegistroCajaScreen(
     var nuevoAncho        by remember { mutableStateOf("") }
     var nuevoAlto         by remember { mutableStateOf("") }
 
-    // ── Verificar duplicado solo si ya hay un código válido ───────────
-    LaunchedEffect(codigoEditable) {
+    // ── Verificar duplicado ───────────────────────────────────────────
+    LaunchedEffect(codigoEditable, viewModel.todasLasCajas) {
         if (!codigoValido) {
             cajaYaExiste = false
             return@LaunchedEffect
         }
-        try {
-            val response = RetrofitClient.api.getTodasLasCajas()
-            cajaYaExiste = if (response.isSuccessful) {
-                response.body()?.any { it.codigo_qr == codigoEditable } ?: false
-            } else false
-        } catch (e: Exception) {
-            cajaYaExiste = false
+        val checkLocal = viewModel.todasLasCajas.any { it.codigo_qr == codigoEditable }
+        if (checkLocal) {
+            cajaYaExiste = true
+        } else {
+            try {
+                val response = com.example.logist_tech.network.RetrofitClient.api.getTodasLasCajas()
+                cajaYaExiste = if (response.isSuccessful) {
+                    val apiCajas = response.body() ?: emptyList()
+                    apiCajas.any { it.codigo_qr == codigoEditable }
+                            || viewModel.todasLasCajas.any { it.codigo_qr == codigoEditable }
+                } else {
+                    viewModel.todasLasCajas.any { it.codigo_qr == codigoEditable }
+                }
+            } catch (e: Exception) {
+                cajaYaExiste = viewModel.todasLasCajas.any { it.codigo_qr == codigoEditable }
+            }
         }
         viewModel.loadInitialData()
     }
@@ -219,7 +283,7 @@ fun RegistroCajaScreen(
                             }
                         )
 
-                        // ── Badge OCR ─────────────────────────────────
+                        // ── Badge pre-llenado ─────────────────────────
                         if (camposPreLlenados.isNotEmpty()) {
                             Card(
                                 shape = RoundedCornerShape(10.dp),
@@ -231,7 +295,7 @@ fun RegistroCajaScreen(
                                 ) {
                                     Text("✓ ", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                                     Text(
-                                        "Pre-llenado por OCR: ${camposPreLlenados.joinToString(", ")}",
+                                        "Pre-llenado por $fuenteDatos: ${camposPreLlenados.joinToString(", ")}",
                                         fontSize = 13.sp,
                                         color = Color(0xFF2E7D32)
                                     )

@@ -9,8 +9,13 @@ import android.util.Log
 import com.example.logist_tech.auth.SessionManager
 import com.example.logist_tech.network.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class LogistViewModel : ViewModel() {
+
+    private val cajasLocalmenteRegistradas = mutableListOf<Caja>()
 
     var tiposCaja by mutableStateOf<List<TipoCaja>>(emptyList())
     var ubicacionesDisponibles by mutableStateOf<List<Ubicacion>>(emptyList())
@@ -60,16 +65,20 @@ class LogistViewModel : ViewModel() {
 
     fun loadTodasLasCajas() {
         viewModelScope.launch {
-            try {
+            val apiCajas = try {
                 val resp = RetrofitClient.api.getTodasLasCajas()
                 if (resp.isSuccessful) {
-                    todasLasCajas = emptyList()
-                    todasLasCajas = resp.body() ?: emptyList()
-                    Log.d("VM_DEBUG", "Dashboard actualizado: ${todasLasCajas.size} cajas")
+                    resp.body() ?: emptyList()
+                } else {
+                    emptyList()
                 }
             } catch (e: Exception) {
-                Log.e("VM_DEBUG", "Error dashboard", e)
+                Log.e("VM_DEBUG", "Error dashboard api query", e)
+                emptyList()
             }
+
+            todasLasCajas = (apiCajas + cajasLocalmenteRegistradas).distinctBy { it.codigo_qr }
+            Log.d("VM_DEBUG", "Dashboard actualizado: ${todasLasCajas.size} cajas (API: ${apiCajas.size}, Local: ${cajasLocalmenteRegistradas.size})")
         }
     }
 
@@ -168,10 +177,44 @@ class LogistViewModel : ViewModel() {
                     loadInitialData()
                     onSuccess()
                 } else {
-                    message = "Error al registrar: ${response.errorBody()?.string()}"
+                    message = "Error al registrar (API): ${response.errorBody()?.string()}"
+                    // Guardar localmente
+                    val localCaja = Caja(
+                        codigo_qr = codigoQr,
+                        producto = producto,
+                        cantidad = cantidad,
+                        peso_kg = peso,
+                        prioridad = prioridad,
+                        categoria = categoria,
+                        es_fragil = if (esFragil) 1 else 0,
+                        estado = "PENDIENTE",
+                        fecha_registro = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+                        id_proveedor = idProveedor,
+                        id_tipo_caja = idTipoCaja
+                    )
+                    cajasLocalmenteRegistradas.add(localCaja)
+                    loadInitialData()
+                    onSuccess()
                 }
             } catch (e: Exception) {
-                message = "Error de red: ${e.message}"
+                message = "Error de red: ${e.message}. Guardada localmente."
+                // Guardar localmente
+                val localCaja = Caja(
+                    codigo_qr = codigoQr,
+                    producto = producto,
+                    cantidad = cantidad,
+                    peso_kg = peso,
+                    prioridad = prioridad,
+                    categoria = categoria,
+                    es_fragil = if (esFragil) 1 else 0,
+                    estado = "PENDIENTE",
+                    fecha_registro = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+                    id_proveedor = idProveedor,
+                    id_tipo_caja = idTipoCaja
+                )
+                cajasLocalmenteRegistradas.add(localCaja)
+                loadInitialData()
+                onSuccess()
             } finally {
                 isLoading = false
             }

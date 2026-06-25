@@ -1,5 +1,6 @@
 package com.example.logist_tech.ocr
 
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -18,17 +19,20 @@ object OcrProcessor {
     fun parsearTextoOcr(textoOcr: String): OcrData {
         val lineas = textoOcr.lines().map { it.trim() }.filter { it.isNotBlank() }
 
-        val nombre         = extraerCampoTexto(lineas, listOf("producto", "nombre", "item"))
-        val cantidad       = extraerCampoNumeroEntero(lineas, listOf("cantidad", "qty", "unidades"))
-        val pesoKg         = extraerCampoNumeroDecimal(lineas, listOf("peso", "kg", "weight"))
-        val categoria      = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
-        val destino        = extraerCampoTexto(lineas, listOf("destino", "destination", "para"))
-        val tipoMovimiento = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
-        val prioridad      = extraerCampoTexto(lineas, listOf("prioridad", "priority"))
-        val esFragilStr    = extraerCampoTexto(lineas, listOf("fragil", "fragile"))
-        val esFragil       = if (esFragilStr == "1" || esFragilStr.lowercase() == "si") 1 else 0
-        val idProveedor    = extraerCampoTexto(lineas, listOf("proveedor", "provider", "id_proveedor"))
-        val idTipoCaja     = extraerCampoTexto(lineas, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
+        val nombre            = extraerCampoTexto(lineas, listOf("producto", "nombre", "item"))
+        val cantidad          = extraerCampoNumeroEntero(lineas, listOf("cantidad", "qty", "unidades"))
+        val pesoKg            = extraerCampoNumeroDecimal(lineas, listOf("peso", "kg", "weight"))
+        val categoriaVal      = extraerCampoTexto(lineas, listOf("categoria", "category", "tipo"))
+        val destino           = extraerCampoTexto(lineas, listOf("destino", "destination", "para"))
+        val tipoMovimientoVal = extraerCampoTexto(lineas, listOf("movimiento", "movement", "tipo_mov"))
+        val prioridad         = extraerCampoTexto(lineas, listOf("prioridad", "priority"))
+        val esFragilStr       = extraerCampoTexto(lineas, listOf("fragil", "fragile"))
+        val esFragil          = if (esFragilStr == "1" || esFragilStr.lowercase() == "si") 1 else 0
+        val idProveedor       = extraerCampoTexto(lineas, listOf("proveedor", "provider", "id_proveedor"))
+        val idTipoCaja        = extraerCampoTexto(lineas, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
+
+        val categoria      = if (categoriaVal.isBlank()) "General" else categoriaVal
+        val tipoMovimiento = if (tipoMovimientoVal.isBlank()) "ENTRADA" else tipoMovimientoVal
         val fecha          = fechaActual()
 
         val camposFaltantes = mutableListOf<String>()
@@ -57,6 +61,72 @@ object OcrProcessor {
     fun parsearQr(qrTexto: String): QrData? {
         if (qrTexto.isBlank() || qrTexto == "Esperando código QR...") return null
 
+        // Intento 1: JSON
+        try {
+            val json = JSONObject(qrTexto)
+
+            fun optString(json: JSONObject, keys: List<String>): String {
+                for (key in keys) if (json.has(key)) return json.optString(key)
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) return json.optString(k)
+                }
+                return ""
+            }
+
+            fun optInt(json: JSONObject, keys: List<String>): Int {
+                for (key in keys) if (json.has(key)) return json.optInt(key)
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) return json.optInt(k)
+                }
+                return 0
+            }
+
+            fun optDouble(json: JSONObject, keys: List<String>): Double {
+                for (key in keys) if (json.has(key)) return json.optDouble(key)
+                val lowerKeys = keys.map { it.lowercase(Locale.getDefault()) }
+                for (k in json.keys()) {
+                    if (k.lowercase(Locale.getDefault()) in lowerKeys) return json.optDouble(k)
+                }
+                return 0.0
+            }
+
+            val idCaja         = optString(json, listOf("idCaja", "idcaja", "id", "caja"))
+            val nombre         = optString(json, listOf("producto", "nombre", "item"))
+            val cantidad       = optInt(json, listOf("cantidad", "qty", "unidades"))
+            val destino        = optString(json, listOf("destino", "destination", "para"))
+            val pesoKg         = optDouble(json, listOf("peso", "pesoKg", "kg", "weight"))
+            val categoria      = optString(json, listOf("categoria", "category", "tipo"))
+            val tipoMovimiento = optString(json, listOf("movimiento", "movement", "tipo_mov"))
+            val prioridad      = optString(json, listOf("prioridad", "priority"))
+            val esFragilRaw    = optString(json, listOf("fragil", "fragile"))
+            val esFragil       = if (esFragilRaw == "1" || esFragilRaw.lowercase() == "si") 1
+            else optInt(json, listOf("fragil", "fragile"))
+            val idProveedor    = optString(json, listOf("proveedor", "provider", "id_proveedor"))
+            val idTipoCaja     = optString(json, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
+
+            if (idCaja.isBlank() && nombre.isBlank() && cantidad == 0) return null
+
+            return QrData(
+                idCaja         = idCaja,
+                nombre         = nombre,
+                cantidad       = cantidad,
+                destino        = destino,
+                pesoKg         = pesoKg,
+                categoria      = categoria,
+                tipoMovimiento = tipoMovimiento,
+                fecha          = fechaActual(),
+                prioridad      = prioridad,
+                esFragil       = esFragil,
+                idProveedor    = idProveedor,
+                idTipoCaja     = idTipoCaja
+            )
+        } catch (e: Exception) {
+            // No es JSON, caemos a parseo por líneas
+        }
+
+        // Intento 2: líneas clave:valor
         val lineas = qrTexto.lines().map { it.trim() }.filter { it.isNotBlank() }
 
         val idCaja         = extraerCampoTexto(lineas, listOf("id", "idcaja", "caja", "codigo"))
@@ -71,7 +141,6 @@ object OcrProcessor {
         val esFragil       = if (esFragilStr == "1" || esFragilStr.lowercase() == "si") 1 else 0
         val idProveedor    = extraerCampoTexto(lineas, listOf("proveedor", "provider", "id_proveedor"))
         val idTipoCaja     = extraerCampoTexto(lineas, listOf("tipocaja", "tipo_caja", "id_tipo_caja"))
-        val fecha          = fechaActual()
 
         if (idCaja.isBlank() && nombre.isBlank() && cantidad == 0) return null
 
@@ -83,7 +152,7 @@ object OcrProcessor {
             pesoKg         = pesoKg,
             categoria      = categoria,
             tipoMovimiento = tipoMovimiento,
-            fecha          = fecha,
+            fecha          = fechaActual(),
             prioridad      = prioridad,
             esFragil       = esFragil,
             idProveedor    = idProveedor,

@@ -1,4 +1,4 @@
-﻿package com.example.logist_tech
+package com.example.logist_tech
 
 import android.net.Uri
 import android.os.Bundle
@@ -87,15 +87,15 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("dashboard") {
-                            DashboardScreen(onNavigateBack = { navController.popBackStack() })
+                            DashboardScreen(onNavigateBack = { navController.popBackStack() }, viewModel = viewModel)
                         }
 
                         composable("history") {
-                            GlobalHistoryScreen(onNavigateBack = { navController.popBackStack() })
+                            GlobalHistoryScreen(onNavigateBack = { navController.popBackStack() }, viewModel = viewModel)
                         }
 
                         composable("reporte") {
-                            ReporteScreen(onNavigateBack = { navController.popBackStack() })
+                            ReporteScreen(onNavigateBack = { navController.popBackStack() }, viewModel = viewModel)
                         }
 
                         composable("scanner") {
@@ -143,7 +143,8 @@ class MainActivity : ComponentActivity() {
                             RegistroCajaScreen(
                                 codigoQr = qr,
                                 onSuccess = { navController.navigate("home") { popUpTo("home") { inclusive = true } } },
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                viewModel = viewModel
                             )
                         }
 
@@ -153,7 +154,8 @@ class MainActivity : ComponentActivity() {
                             GestionCajaScreen(
                                 codigoQr = qr,
                                 onSuccess = { navController.navigate("home") { popUpTo("home") { inclusive = true } } },
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                viewModel = viewModel
                             )
                         }
 
@@ -163,6 +165,11 @@ class MainActivity : ComponentActivity() {
                                 textoQr = ScannerResultHolder.textoQr,
                                 imagenCapturada = ScannerResultHolder.imagenBitmap,
                                 onRegistrarEnInventario = {
+                                    navController.navigate("registro_caja/${Uri.encode(" ")}") {
+                                        popUpTo("ocr_result") { inclusive = true }
+                                    }
+                                },
+                                onVolver = {
                                     navController.popBackStack()
                                 }
                             )
