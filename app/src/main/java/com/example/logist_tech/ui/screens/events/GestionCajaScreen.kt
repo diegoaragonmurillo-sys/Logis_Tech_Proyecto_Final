@@ -166,20 +166,21 @@ fun GestionCajaScreen(
                                 if (viewModel.isLoading) {
                                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                                 } else {
-                                    // Mostrar solo el siguiente paso lógico según estado actual
                                     when (estadoActual) {
                                         "REGISTRADO" -> {
-                                            MensajeInfo("El receptor aún no confirmó la recepción.")
+                                            // BANDA puede confirmar recepción directamente
+                                            EstadoBoton("CONFIRMAR RECEPCIÓN EN ALMACÉN", Color(0xFFF59E0B)) {
+                                                estadoAConfirmar = "RECEPCION_EN_ALMACEN"
+                                                showConfirmDialog = true
+                                            }
                                         }
                                         "RECEPCION_EN_ALMACEN" -> {
-                                            // Entrada — la caja acaba de llegar al almacén
                                             EstadoBoton("CONFIRMAR EN ESTANTE", Color(0xFF10B981)) {
                                                 estadoAConfirmar = "EN_ESTANTE"
                                                 showConfirmDialog = true
                                             }
                                         }
                                         "EN_ESTANTE" -> {
-                                            // La caja está en almacén, banda la prepara para salida
                                             EstadoBoton("PREPARAR SALIDA", Color(0xFF8B5CF6)) {
                                                 estadoAConfirmar = "SALIDA_DE_ESTANTE"
                                                 showConfirmDialog = true
