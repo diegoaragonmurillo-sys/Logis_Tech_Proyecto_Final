@@ -31,30 +31,29 @@ fun OcrResultScreen(
     val ocrData = remember(textoOcr) { OcrProcessor.parsearTextoOcr(textoOcr) }
     val qrData  = remember(textoQr)  { OcrProcessor.parsearQr(textoQr) }
 
-    val nombreMostrar = (if (esEscaneoQr) qrData?.nombre else ocrData.nombre)
+    val nombreMostrar = ocrData.nombre
         .orEmpty().ifBlank { "No detectado" }
 
     val cantidadMostrar = run {
-        val n = if (esEscaneoQr) qrData?.cantidad ?: 0 else ocrData.cantidad
+        val n = ocrData.cantidad
         if (n > 0) "$n" else "No detectado"
     }
 
     val pesoMostrar = run {
-        val p = if (esEscaneoQr) qrData?.pesoKg ?: 0.0 else ocrData.pesoKg
+        val p = ocrData.pesoKg
         if (p > 0.0) "$p kg" else "No especificado"
     }
 
-    val categoriaMostrar = (if (esEscaneoQr) qrData?.categoria else ocrData.categoria)
+    val categoriaMostrar = ocrData.categoria
         .orEmpty().ifBlank { "No especificado" }
 
-    val destinoMostrar = (if (esEscaneoQr) qrData?.destino else ocrData.destino)
+    val destinoMostrar = ocrData.destino
         .orEmpty().ifBlank { "No detectado" }
 
-    val movimientoMostrar = (if (esEscaneoQr) qrData?.tipoMovimiento else ocrData.tipoMovimiento)
+    val movimientoMostrar = ocrData.tipoMovimiento
         .orEmpty().ifBlank { "No especificado" }
 
-    val fechaMostrar = (if (esEscaneoQr) qrData?.fecha else ocrData.fecha)
-        .orEmpty().ifBlank { "No especificado" }
+    val fechaMostrar = "Se genera al registrar"
 
     Column(
         modifier = Modifier
