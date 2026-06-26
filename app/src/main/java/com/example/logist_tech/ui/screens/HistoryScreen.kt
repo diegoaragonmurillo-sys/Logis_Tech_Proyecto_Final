@@ -140,7 +140,7 @@ fun TimelineItem(mov: HistorialMovimiento) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "${mov.id_operador} • ${mov.tipo_operador}",
+                        text = "${mov.id_operator} • ${mov.tipo_operador}",
                         fontSize = 13.sp,
                         color = Color.DarkGray
                     )

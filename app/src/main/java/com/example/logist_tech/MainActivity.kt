@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
                                             val encodedId = Uri.encode(idCaja.ifBlank { qr })
 
                                             val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
-                                                "registro_caja/$encodedId"
+                                                "registro_caja/${Uri.encode(qr)}"
                                             else
                                                 "gestion_caja/$encodedId"
                                             navController.navigate(destino)
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                                             if (idCaja.isNotBlank()) {
                                                 val encodedId = Uri.encode(idCaja)
                                                 val destino = if (SessionManager.rol == SessionManager.Rol.RECEPTOR)
-                                                    "registro_caja/$encodedId"
+                                                    "registro_caja/${Uri.encode(ocr)}"
                                                 else
                                                     "gestion_caja/$encodedId"
                                                 navController.navigate(destino)

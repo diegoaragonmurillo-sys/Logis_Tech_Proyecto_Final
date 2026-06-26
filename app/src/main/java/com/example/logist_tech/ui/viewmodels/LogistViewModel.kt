@@ -31,6 +31,10 @@ class LogistViewModel : ViewModel() {
     var reporteLoading by mutableStateOf(false)
     var reporteError by mutableStateOf<String?>(null)
 
+    fun clearMessage() {
+        message = null
+    }
+
     fun loadInitialData() {
         viewModelScope.launch {
             isLoading = true

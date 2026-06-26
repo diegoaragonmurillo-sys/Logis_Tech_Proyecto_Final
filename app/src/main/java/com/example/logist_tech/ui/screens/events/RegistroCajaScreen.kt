@@ -31,6 +31,10 @@ fun RegistroCajaScreen(
     onBack: () -> Unit,
     viewModel: LogistViewModel = viewModel()
 ) {
+    LaunchedEffect(Unit) {
+        viewModel.clearMessage()
+    }
+
     // ── Datos desde OCR ───────────────────────────────────────────────
     val ocrTexto = ScannerResultHolder.textoOcr
     val ocrData  = remember(ocrTexto) {

@@ -42,6 +42,7 @@ fun GestionCajaScreen(
     var ubicacionInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
+        viewModel.clearMessage()
         try {
             val response = RetrofitClient.api.getCaja(codigoQr)
             if (response.isSuccessful && response.body() != null) {
