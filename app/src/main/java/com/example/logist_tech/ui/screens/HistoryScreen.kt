@@ -32,15 +32,13 @@ fun GlobalHistoryScreen(
         viewModel.loadHistorialGlobal()
     }
 
-    // Solo mostrar entradas y salidas
-    val historialFiltrado = viewModel.historialGlobal.filter {
-        it.estado_nuevo == "REGISTRADO" || it.estado_nuevo == "ENTREGADO"
-    }
+    // Mostrar todos los movimientos sin filtro
+    val historialFiltrado = viewModel.historialGlobal
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial de Entradas y Salidas", fontWeight = FontWeight.Bold) },
+                title = { Text("Historial de Movimientos", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -64,7 +62,7 @@ fun GlobalHistoryScreen(
                         modifier = Modifier.fillParentMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No hay entradas ni salidas registradas", color = Color.Gray)
+                        Text("No hay movimientos registrados", color = Color.Gray)
                     }
                 }
             }
@@ -77,9 +75,15 @@ fun GlobalHistoryScreen(
 
 @Composable
 fun TimelineItem(mov: HistorialMovimiento) {
-    val esEntrada = mov.estado_nuevo == "REGISTRADO"
-    val stateColor = if (esEntrada) Color(0xFF1976D2) else Color(0xFF455A64)
-    val label = if (esEntrada) "ENTRADA" else "SALIDA"
+    val (stateColor, label) = when (mov.estado_nuevo) {
+        "REGISTRADO"           -> Color(0xFF1976D2) to "ENTRADA"
+        "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B) to "EN ALMACÉN"
+        "EN_ESTANTE"           -> Color(0xFF10B981) to "EN ESTANTE"
+        "SALIDA_DE_ESTANTE"    -> Color(0xFF8B5CF6) to "SALIDA ESTANTE"
+        "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899) to "SALIENDO"
+        "ENTREGADO"            -> Color(0xFF64748B) to "ENTREGADO"
+        else                   -> Color.Gray to mov.estado_nuevo
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -97,7 +101,6 @@ fun TimelineItem(mov: HistorialMovimiento) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Badge ENTRADA / SALIDA
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = stateColor.copy(alpha = 0.1f)
