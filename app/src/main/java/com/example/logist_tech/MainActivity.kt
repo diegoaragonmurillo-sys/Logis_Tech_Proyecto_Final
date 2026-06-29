@@ -35,6 +35,7 @@ private val REGEX_ID_CAJA = Regex("^CJ-\\d{4}$")
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SessionManager.init(this)
         enableEdgeToEdge()
         setContent {
             Logist_TechTheme {
