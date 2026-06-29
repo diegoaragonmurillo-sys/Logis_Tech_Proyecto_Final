@@ -31,17 +31,18 @@ fun DashboardScreen(
         viewModel.loadTodasLasCajas()
     }
 
-    // Agrupar cajas por producto con su cantidad total
-    // Solo cajas que no han sido entregadas (en stock activo)
+    val enAlmacen = listOf(
+        "RECEPCION_EN_ALMACEN",
+        "EN_ESTANTE",
+        "SALIDA_DE_ESTANTE",
+        "SALIENDO_DE_ALMACEN"
+    )
+
     val stockPorProducto = viewModel.todasLasCajas
         .filter { it.estado != "ENTREGADO" }
         .groupBy { it.producto.ifBlank { "Sin nombre" } }
         .map { (producto, cajas) ->
-            Triple(
-                producto,
-                cajas.sumOf { it.cantidad },  // cantidad total de unidades
-                cajas.size                     // número de cajas
-            )
+            Triple(producto, cajas.sumOf { it.cantidad }, cajas.size)
         }
         .sortedByDescending { it.second }
 
@@ -60,21 +61,64 @@ fun DashboardScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
+            modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── Stats rápidas ──────────────────────────────────────────
+
+            // ── Fila 1 de stats ───────────────────────────────────────
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StatChip("Total cajas", viewModel.todasLasCajas.size.toString(), Color(0xFF2980B9), Modifier.weight(1f))
-                    StatChip("En almacén", viewModel.todasLasCajas.count { it.estado != "ENTREGADO" }.toString(), Color(0xFF10B981), Modifier.weight(1f))
-                    StatChip("Entregadas", viewModel.todasLasCajas.count { it.estado == "ENTREGADO" }.toString(), Color(0xFF64748B), Modifier.weight(1f))
+                    StatChip(
+                        "Total cajas",
+                        viewModel.todasLasCajas.size.toString(),
+                        Color(0xFF2980B9),
+                        Modifier.weight(1f)
+                    )
+                    StatChip(
+                        "Pendientes",
+                        viewModel.todasLasCajas.count { it.estado == "REGISTRADO" }.toString(),
+                        Color(0xFFF59E0B),
+                        Modifier.weight(1f)
+                    )
+                    StatChip(
+                        "Entregadas",
+                        viewModel.todasLasCajas.count { it.estado == "ENTREGADO" }.toString(),
+                        Color(0xFF64748B),
+                        Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // ── Fila 2 de stats ───────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatChip(
+                        "En almacén",
+                        viewModel.todasLasCajas.count { it.estado in enAlmacen }.toString(),
+                        Color(0xFF10B981),
+                        Modifier.weight(1f)
+                    )
+                    StatChip(
+                        "En estante",
+                        viewModel.todasLasCajas.count { it.estado == "EN_ESTANTE" }.toString(),
+                        Color(0xFF10B981),
+                        Modifier.weight(1f)
+                    )
+                    StatChip(
+                        "Saliendo",
+                        viewModel.todasLasCajas.count {
+                            it.estado in listOf("SALIDA_DE_ESTANTE", "SALIENDO_DE_ALMACEN")
+                        }.toString(),
+                        Color(0xFFEC4899),
+                        Modifier.weight(1f)
+                    )
                 }
             }
 
@@ -95,7 +139,10 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White)
                     ) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text("No hay productos en stock", color = Color.Gray)
                         }
                     }
@@ -156,11 +203,7 @@ fun StockProductoCard(producto: String, unidades: Int, cajas: Int) {
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF2980B9)
                 )
-                Text(
-                    text = "unidades",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
+                Text(text = "unidades", fontSize = 11.sp, color = Color.Gray)
             }
         }
     }
