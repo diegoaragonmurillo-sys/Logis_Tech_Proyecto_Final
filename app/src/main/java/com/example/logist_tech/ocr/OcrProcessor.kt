@@ -13,7 +13,9 @@ object OcrProcessor {
     fun extraerIdDeTexto(texto: String): String {
         val lineas = texto.lines().map { it.trim() }.filter { it.isNotBlank() }
         val raw = extraerCampoTexto(lineas, listOf("id", "codigo", "serie", "idcaja"))
-        return if (Regex("^CJ-\\d{4}$").matches(raw)) raw else ""
+        // Normaliza: quita espacios y pasa a mayúsculas antes de validar formato
+        val limpio = raw.replace(" ", "").uppercase()
+        return if (Regex("^CJ-\\d{4}$").matches(limpio)) limpio else ""
     }
 
     fun parsearTextoOcr(textoOcr: String): OcrData {
