@@ -29,22 +29,19 @@ fun GestionCajaScreen(
     onBack: () -> Unit,
     viewModel: LogistViewModel = viewModel()
 ) {
+    val codigoLimpio = remember(codigoQr) { codigoQr.trim().replace(" ", "").uppercase() }
+
     val rol = SessionManager.rol
     var caja by remember { mutableStateOf<Caja?>(null) }
     var cajaEncontrada by remember { mutableStateOf<Boolean?>(null) }
 
-    // Diálogo genérico de confirmación (sin ubicación)
     var showConfirmDialog by remember { mutableStateOf(false) }
     var estadoAConfirmar by remember { mutableStateOf("") }
 
-    // Diálogo especial para EN_ESTANTE (requiere ubicación)
-    var showUbicacionDialog by remember { mutableStateOf(false) }
-    var ubicacionInput by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
+    LaunchedEffect(codigoLimpio) {
         viewModel.clearMessage()
         try {
-            val response = RetrofitClient.api.getCaja(codigoQr)
+            val response = RetrofitClient.api.getCaja(codigoLimpio)
             if (response.isSuccessful && response.body() != null) {
                 caja = response.body()
                 cajaEncontrada = true
@@ -62,69 +59,19 @@ fun GestionCajaScreen(
             onDismissRequest = { showConfirmDialog = false },
             title = { Text("Confirmar acción") },
             text = {
-                Text("¿Cambiar la caja $codigoQr al estado \"${estadoAConfirmar.replace("_", " ")}\"?")
+                Text("¿Cambiar la caja $codigoLimpio al estado \"${estadoAConfirmar.replace("_", " ")}\"?")
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showConfirmDialog = false
-                        viewModel.cambiarEstado(codigoQr, estadoAConfirmar, null, onSuccess)
+                        viewModel.cambiarEstado(codigoLimpio, estadoAConfirmar, null, onSuccess)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2980B9))
                 ) { Text("CONFIRMAR") }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) { Text("CANCELAR") }
-            }
-        )
-    }
-
-    // ── Diálogo para EN_ESTANTE (pide ubicación) ──────────────────────
-    if (showUbicacionDialog) {
-        AlertDialog(
-            onDismissRequest = { showUbicacionDialog = false },
-            title = { Text("Asignar ubicación en estante") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Ingresa el código de ubicación donde se colocará la caja (ej: P1-E1-N1).",
-                        fontSize = 13.sp,
-                        color = Color.Gray
-                    )
-                    OutlinedTextField(
-                        value = ubicacionInput,
-                        onValueChange = { ubicacionInput = it.uppercase() },
-                        label = { Text("Código de ubicación") },
-                        placeholder = { Text("P1-E1-N1") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    if (viewModel.ubicacionesDisponibles.isNotEmpty()) {
-                        Text(
-                            "Disponibles: ${viewModel.ubicacionesDisponibles.take(5).joinToString(", ") { it.id_coordenada }}",
-                            fontSize = 11.sp,
-                            color = Color(0xFF2980B9)
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (ubicacionInput.isNotBlank()) {
-                            showUbicacionDialog = false
-                            viewModel.cambiarEstado(codigoQr, "EN_ESTANTE", ubicacionInput, onSuccess)
-                            ubicacionInput = ""
-                        }
-                    },
-                    enabled = ubicacionInput.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-                ) { Text("CONFIRMAR") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUbicacionDialog = false; ubicacionInput = "" }) {
-                    Text("CANCELAR")
-                }
             }
         )
     }
@@ -155,7 +102,7 @@ fun GestionCajaScreen(
                         Spacer(Modifier.height(16.dp))
                         Text("¡CAJA NO REGISTRADA!", color = Color(0xFFC62828), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
                         Spacer(Modifier.height(8.dp))
-                        Text("La caja \"$codigoQr\" no existe en el sistema.", textAlign = TextAlign.Center, color = Color.DarkGray)
+                        Text("La caja \"$codigoLimpio\" no existe en el sistema.", textAlign = TextAlign.Center, color = Color.DarkGray)
                         Spacer(Modifier.height(32.dp))
                         Button(
                             onClick = onBack,
@@ -183,16 +130,13 @@ fun GestionCajaScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("Caja Identificada", fontSize = 12.sp, color = Color.Gray)
-                                Text(codigoQr, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2980B9))
+                                Text(codigoLimpio, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2980B9))
                                 if (cajaData != null) {
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                                     InfoRow("Producto", cajaData.producto)
                                     InfoRow("Cantidad", cajaData.cantidad.toString())
                                     InfoRow("Peso", "${cajaData.peso_kg} kg")
                                     InfoRow("Estado actual", estadoActual.replace("_", " "))
-                                    if (!cajaData.id_ubicacion.isNullOrBlank()) {
-                                        InfoRow("Ubicación", cajaData.id_ubicacion)
-                                    }
                                 }
                             }
                         }
@@ -231,25 +175,7 @@ fun GestionCajaScreen(
                                         }
 
                                         "RECEPCION_EN_ALMACEN" -> {
-                                            MensajeInfo("Indica la ubicación física donde se colocará la caja.")
-                                            Spacer(Modifier.height(4.dp))
-                                            EstadoBoton("COLOCAR EN ESTANTE", Color(0xFF10B981)) {
-                                                viewModel.loadInitialData()
-                                                showUbicacionDialog = true
-                                            }
-                                        }
-
-                                        "EN_ESTANTE" -> {
-                                            MensajeInfo("La caja está en estante. Confírmalo para iniciar la salida.")
-                                            Spacer(Modifier.height(4.dp))
-                                            EstadoBoton("INICIAR SALIDA DE ESTANTE", Color(0xFF8B5CF6)) {
-                                                estadoAConfirmar = "SALIDA_DE_ESTANTE"
-                                                showConfirmDialog = true
-                                            }
-                                        }
-
-                                        "SALIDA_DE_ESTANTE" -> {
-                                            MensajeInfo("Confirma que la caja está siendo retirada del almacén.")
+                                            MensajeInfo("Confirma la salida de la caja del almacén.")
                                             Spacer(Modifier.height(4.dp))
                                             EstadoBoton("CONFIRMAR SALIDA DE ALMACÉN", Color(0xFFEC4899)) {
                                                 estadoAConfirmar = "SALIENDO_DE_ALMACEN"
@@ -258,16 +184,7 @@ fun GestionCajaScreen(
                                         }
 
                                         "SALIENDO_DE_ALMACEN" -> {
-                                            MensajeInfo("Confirma la entrega final al cliente o destino.")
-                                            Spacer(Modifier.height(4.dp))
-                                            EstadoBoton("MARCAR COMO ENTREGADO", Color(0xFF64748B)) {
-                                                estadoAConfirmar = "ENTREGADO"
-                                                showConfirmDialog = true
-                                            }
-                                        }
-
-                                        "ENTREGADO" -> {
-                                            MensajeInfo("✓ Esta caja ya fue entregada exitosamente.")
+                                            MensajeInfo("✓ Esta caja ya salió del almacén exitosamente.")
                                         }
 
                                         else -> {
@@ -311,11 +228,8 @@ fun GestionCajaScreen(
 private fun EstadoBadge(estado: String) {
     val (color, label) = when (estado) {
         "REGISTRADO"            -> Color(0xFF3B82F6) to "Pendiente de recepción"
-        "RECEPCION_EN_ALMACEN"  -> Color(0xFFF59E0B) to "En recepción → asignar estante"
-        "EN_ESTANTE"            -> Color(0xFF10B981) to "En estante → listo para salida"
-        "SALIDA_DE_ESTANTE"     -> Color(0xFF8B5CF6) to "Saliendo del estante"
-        "SALIENDO_DE_ALMACEN"   -> Color(0xFFEC4899) to "Saliendo del almacén"
-        "ENTREGADO"             -> Color(0xFF64748B) to "Entregado ✓"
+        "RECEPCION_EN_ALMACEN"  -> Color(0xFFF59E0B) to "En almacén → listo para salir"
+        "SALIENDO_DE_ALMACEN"   -> Color(0xFFEC4899) to "Salió del almacén ✓"
         else                    -> Color.Gray        to estado
     }
     Surface(
