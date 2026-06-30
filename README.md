@@ -39,17 +39,13 @@ El backend (FastAPI) está alojado en un **VPS de Elastika**, lo que permite man
 
 ## Video demostrativo
 
-[Ver video en YouTube](https://youtu.be/RV9x3drUul8)
+[Ver video en YouTube](https://youtu.be/RV9x3drUul8) https://youtu.be/RV9x3drUul8
 
 ## Integrantes
 
 - Katherine Melany Quispe Romero
 - Alexandra Fedra Robles Uscamayta
-- Willy Samuel Torres Cayo
-- Diego Arturo Aragon Murillo
-- Angelo Rodrigo Vargas Jucharo
-- Anthony Fernando Arana Apaza
-- Angelo Joseph Ricasca Montes
+- Victor Delgado
 
 ## Configuración del proyecto
 
