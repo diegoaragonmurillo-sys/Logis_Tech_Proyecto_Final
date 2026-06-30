@@ -8,12 +8,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,20 +33,18 @@ fun DashboardScreen(
         viewModel.loadTodasLasCajas()
     }
 
-    val enAlmacen = listOf(
-        "RECEPCION_EN_ALMACEN",
-        "EN_ESTANTE",
-        "SALIDA_DE_ESTANTE",
-        "SALIENDO_DE_ALMACEN"
-    )
-
     val stockPorProducto = viewModel.todasLasCajas
-        .filter { it.estado != "ENTREGADO" }
+        .filter { it.estado != "SALIENDO_DE_ALMACEN" }
         .groupBy { it.producto.ifBlank { "Sin nombre" } }
         .map { (producto, cajas) ->
             Triple(producto, cajas.sumOf { it.cantidad }, cajas.size)
         }
         .sortedByDescending { it.second }
+
+    val total      = viewModel.todasLasCajas.size
+    val pendientes = viewModel.todasLasCajas.count { it.estado == "REGISTRADO" }
+    val enAlmacen  = viewModel.todasLasCajas.count { it.estado == "RECEPCION_EN_ALMACEN" }
+    val salieron   = viewModel.todasLasCajas.count { it.estado == "SALIENDO_DE_ALMACEN" }
 
     Scaffold(
         containerColor = Color(0xFFF8FAFC),
@@ -63,62 +63,26 @@ fun DashboardScreen(
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
 
-            // ── Fila 1 de stats ───────────────────────────────────────
+            // ── Stats en grid 2x2 — más aire, números legibles ────────
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatChip(
-                        "Total cajas",
-                        viewModel.todasLasCajas.size.toString(),
-                        Color(0xFF2980B9),
-                        Modifier.weight(1f)
-                    )
-                    StatChip(
-                        "Pendientes",
-                        viewModel.todasLasCajas.count { it.estado == "REGISTRADO" }.toString(),
-                        Color(0xFFF59E0B),
-                        Modifier.weight(1f)
-                    )
-                    StatChip(
-                        "Entregadas",
-                        viewModel.todasLasCajas.count { it.estado == "ENTREGADO" }.toString(),
-                        Color(0xFF64748B),
-                        Modifier.weight(1f)
-                    )
-                }
-            }
-
-            // ── Fila 2 de stats ───────────────────────────────────────
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatChip(
-                        "En almacén",
-                        viewModel.todasLasCajas.count { it.estado in enAlmacen }.toString(),
-                        Color(0xFF10B981),
-                        Modifier.weight(1f)
-                    )
-                    StatChip(
-                        "En estante",
-                        viewModel.todasLasCajas.count { it.estado == "EN_ESTANTE" }.toString(),
-                        Color(0xFF10B981),
-                        Modifier.weight(1f)
-                    )
-                    StatChip(
-                        "Saliendo",
-                        viewModel.todasLasCajas.count {
-                            it.estado in listOf("SALIDA_DE_ESTANTE", "SALIENDO_DE_ALMACEN")
-                        }.toString(),
-                        Color(0xFFEC4899),
-                        Modifier.weight(1f)
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatChip("Total cajas", total.toString(), Icons.Default.Inventory2, Color(0xFF2980B9), Modifier.weight(1f))
+                        StatChip("Pendientes", pendientes.toString(), Icons.Default.HourglassBottom, Color(0xFFF59E0B), Modifier.weight(1f))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatChip("En almacén", enAlmacen.toString(), Icons.Default.Warehouse, Color(0xFF10B981), Modifier.weight(1f))
+                        StatChip("Salieron", salieron.toString(), Icons.Default.LocalShipping, Color(0xFFEC4899), Modifier.weight(1f))
+                    }
                 }
             }
 
@@ -148,7 +112,10 @@ fun DashboardScreen(
                     }
                 }
             } else {
-                items(stockPorProducto) { (producto, unidades, cajas) ->
+                items(
+                    items = stockPorProducto,
+                    key = { it.first }
+                ) { (producto, unidades, cajas) ->
                     StockProductoCard(producto, unidades, cajas)
                 }
             }
@@ -164,9 +131,14 @@ fun DashboardScreen(
                 )
             }
 
-            items(viewModel.todasLasCajas) { caja ->
+            items(
+                items = viewModel.todasLasCajas,
+                key = { it.codigo_qr }
+            ) { caja ->
                 MinimalistCajaItem(caja)
             }
+
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
@@ -210,16 +182,29 @@ fun StockProductoCard(producto: String, unidades: Int, cajas: Int) {
 }
 
 @Composable
-fun StatChip(label: String, value: String, color: Color, modifier: Modifier) {
+fun StatChip(label: String, value: String, icon: ImageVector, color: Color, modifier: Modifier) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.Start) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(color.copy(alpha = 0.12f), shape = RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(value, fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color(0xFF1E293B))
+            Spacer(Modifier.height(2.dp))
             Text(label, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-            Text(value, fontSize = 22.sp, fontWeight = FontWeight.Black, color = color)
         }
     }
 }
@@ -273,10 +258,7 @@ fun getEstadoColor(estado: String): Color {
     return when (estado) {
         "REGISTRADO"           -> Color(0xFF3B82F6)
         "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B)
-        "EN_ESTANTE"           -> Color(0xFF10B981)
-        "SALIDA_DE_ESTANTE"    -> Color(0xFF8B5CF6)
         "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899)
-        "ENTREGADO"            -> Color(0xFF64748B)
         else                   -> Color.Gray
     }
 }
