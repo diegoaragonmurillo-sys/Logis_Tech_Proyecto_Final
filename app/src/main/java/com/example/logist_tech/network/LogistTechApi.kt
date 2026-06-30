@@ -41,7 +41,7 @@ data class HistorialMovimiento(
     val id: Int = 0,
     val id_caja: String = "",
     val producto: String = "",
-    val id_operator: String = "",
+    val id_operador: String = "",
     val tipo_operador: String = "",
     val estado_anterior: String = "",
     val estado_nuevo: String = "",
