@@ -2,9 +2,8 @@ package com.example.logist_tech.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -29,7 +28,6 @@ fun ReporteScreen(
 ) {
     var periodoSeleccionado by remember { mutableStateOf("diario") }
 
-    // Cargar reporte al entrar y cuando cambia el período
     LaunchedEffect(periodoSeleccionado) {
         viewModel.loadReporte(periodoSeleccionado)
     }
@@ -48,245 +46,229 @@ fun ReporteScreen(
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── Selector de período ──────────────────────────────────────────
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+            item {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    listOf("diario" to "Hoy", "semanal" to "Semana", "mensual" to "Mes").forEach { (key, label) ->
-                        FilterChip(
-                            selected = periodoSeleccionado == key,
-                            onClick = { periodoSeleccionado = key },
-                            label = { Text(label, fontWeight = FontWeight.Medium) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF2980B9),
-                                selectedLabelColor = Color.White
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("diario" to "Hoy", "semanal" to "Semana", "mensual" to "Mes").forEach { (key, label) ->
+                            FilterChip(
+                                selected = periodoSeleccionado == key,
+                                onClick = { periodoSeleccionado = key },
+                                label = { Text(label, fontWeight = FontWeight.Medium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF2980B9),
+                                    selectedLabelColor = Color.White
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
 
             when {
                 viewModel.reporteLoading -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            CircularProgressIndicator(color = Color(0xFF2980B9))
-                            Text("Generando reporte con IA...", color = Color.Gray, fontSize = 14.sp)
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                CircularProgressIndicator(color = Color(0xFF2980B9))
+                                Text("Generando reporte con IA...", color = Color.Gray, fontSize = 14.sp)
+                            }
                         }
                     }
                 }
 
                 viewModel.reporteError != null -> {
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFC62828), modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Text(viewModel.reporteError ?: "", color = Color(0xFFC62828), fontSize = 14.sp)
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFC62828), modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(viewModel.reporteError ?: "", color = Color(0xFFC62828), fontSize = 14.sp)
+                            }
                         }
                     }
                 }
 
                 viewModel.reporte != null -> {
-                    val datos = viewModel.reporte!!.datos
-                    val analisis = viewModel.reporte!!.analisis_ia
+                    val reporte = viewModel.reporte!!
+                    val datos = reporte.datos
+                    val analisis = reporte.analisis_ia
 
-                    // ── Fecha del reporte ────────────────────────────────────
-                    Text(
-                        text = "${viewModel.reporte!!.fecha_inicio}  →  ${viewModel.reporte!!.fecha_fin}",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
+                    // ── Métricas derivadas del flujo de 3 estados ───────
+                    // registradas: en estado REGISTRADO, esperando que BANDA confirme recepción
+                    // enAlmacen:   en estado RECEPCION_EN_ALMACEN, esperando salida
+                    // salieron:    en estado SALIENDO_DE_ALMACEN (= "entregadas" del backend)
+                    val registradas = datos.cajas_por_estado["REGISTRADO"] ?: 0
+                    val enAlmacen   = datos.cajas_por_estado["RECEPCION_EN_ALMACEN"] ?: 0
+                    val salieron    = datos.entregadas
 
-                    // ── Cards de métricas ────────────────────────────────────
-                    Text(
-                        text = "MÉTRICAS DEL PERÍODO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        letterSpacing = 1.2.sp
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        MetricaCard("Total Cajas", datos.total_cajas.toString(), Icons.Default.Inventory2, Color(0xFF2980B9), Modifier.weight(1f))
-                        MetricaCard("Entregadas", datos.entregadas.toString(), Icons.Default.CheckCircle, Color(0xFF10B981), Modifier.weight(1f))
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        MetricaCard("Pendientes", datos.pendientes.toString(), Icons.Default.HourglassBottom, Color(0xFFF59E0B), Modifier.weight(1f))
-                        MetricaCard("En Proceso", datos.en_proceso.toString(), Icons.Default.Loop, Color(0xFF8B5CF6), Modifier.weight(1f))
-                    }
-
-                    // ── Almacén ──────────────────────────────────────────────
-                    Text(
-                        text = "ALMACÉN",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        letterSpacing = 1.2.sp
-                    )
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AlmacenRow("Estantes ocupados", datos.estantes_ocupados.toString(), Color(0xFFE53935))
-                            HorizontalDivider()
-                            AlmacenRow("Estantes libres", datos.estantes_libres.toString(), Color(0xFF10B981))
-                            HorizontalDivider()
-                            AlmacenRow("Total estantes", datos.estantes_total.toString(), Color(0xFF2980B9))
-
-                            if (datos.estantes_total > 0) {
-                                Spacer(Modifier.height(4.dp))
-                                Text("Ocupación", fontSize = 12.sp, color = Color.Gray)
-                                LinearProgressIndicator(
-                                    progress = { datos.estantes_ocupados.toFloat() / datos.estantes_total.toFloat() },
-                                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                                    color = Color(0xFF2980B9),
-                                    trackColor = Color(0xFFE0E0E0)
-                                )
-                                Text(
-                                    "${(datos.estantes_ocupados.toFloat() / datos.estantes_total.toFloat() * 100).toInt()}% ocupado",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray
-                                )
-                            }
-                        }
-                    }
-
-                    // ── Operador más activo ──────────────────────────────────
-                    if (datos.top_operador != "Sin actividad") {
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF3FB)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(28.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Column {
-                                    Text("Operador más activo", fontSize = 12.sp, color = Color.Gray)
-                                    Text(datos.top_operador, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2980B9))
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Estados de cajas ─────────────────────────────────────
-                    if (datos.cajas_por_estado.isNotEmpty()) {
+                    item {
                         Text(
-                            text = "DISTRIBUCIÓN POR ESTADO",
+                            text = "${reporte.fecha_inicio}  →  ${reporte.fecha_fin}",
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    item {
+                        Text(
+                            text = "MÉTRICAS DEL PERÍODO",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Gray,
                             letterSpacing = 1.2.sp
                         )
+                    }
 
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                datos.cajas_por_estado.forEach { (estado, cantidad) ->
-                                    val color = estadoColor(estado)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .background(color, shape = RoundedCornerShape(2.dp))
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            estado.replace("_", " "),
-                                            fontSize = 13.sp,
-                                            color = Color(0xFF1E293B),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            cantidad.toString(),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = color
-                                        )
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                MetricaCard("Total Cajas", datos.total_cajas.toString(), Icons.Default.Inventory2, Color(0xFF2980B9), Modifier.weight(1f))
+                                MetricaCard("Pendientes", registradas.toString(), Icons.Default.HourglassBottom, Color(0xFF3B82F6), Modifier.weight(1f))
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                MetricaCard("En Almacén", enAlmacen.toString(), Icons.Default.Warehouse, Color(0xFFF59E0B), Modifier.weight(1f))
+                                MetricaCard("Salieron", salieron.toString(), Icons.Default.LocalShipping, Color(0xFFEC4899), Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    if (datos.top_operador != "Sin actividad") {
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF3FB)),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text("Operador más activo", fontSize = 12.sp, color = Color.Gray)
+                                        Text(datos.top_operador, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2980B9))
                                     }
                                 }
                             }
                         }
                     }
 
-                    // ── Análisis de Gemini ───────────────────────────────────
-                    Text(
-                        text = "ANÁLISIS IA",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        letterSpacing = 1.2.sp
-                    )
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF60A5FA), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Gemini Flash", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
-                            }
+                    // ── Distribución por estado — 100% dinámica desde el backend ──
+                    if (datos.cajas_por_estado.isNotEmpty()) {
+                        item {
                             Text(
-                                text = analisis,
-                                fontSize = 14.sp,
-                                color = Color(0xFFE2E8F0),
-                                lineHeight = 22.sp
+                                text = "DISTRIBUCIÓN POR ESTADO",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray,
+                                letterSpacing = 1.2.sp
                             )
+                        }
+
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    // Solo itera lo que el backend realmente devolvió.
+                                    // Si un estado no tiene cajas, no aparece — sin nada hardcodeado.
+                                    datos.cajas_por_estado.entries
+                                        .sortedByDescending { it.value }
+                                        .forEach { (estado, cantidad) ->
+                                            val color = estadoColor(estado)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(10.dp)
+                                                        .background(color, shape = RoundedCornerShape(2.dp))
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    estado.replace("_", " "),
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFF1E293B),
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Text(
+                                                    cantidad.toString(),
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = color
+                                                )
+                                            }
+                                        }
+                                }
+                            }
                         }
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    item {
+                        Text(
+                            text = "ANÁLISIS IA",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
 
-                    // Botón refrescar
-                    OutlinedButton(
-                        onClick = { viewModel.loadReporte(periodoSeleccionado) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Regenerar reporte")
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF60A5FA), modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Gemini Flash", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                                }
+                                Text(
+                                    text = analisis,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFE2E8F0),
+                                    lineHeight = 22.sp
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { viewModel.loadReporte(periodoSeleccionado) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Regenerar reporte")
+                        }
                     }
                 }
             }
@@ -311,20 +293,9 @@ private fun MetricaCard(label: String, value: String, icon: ImageVector, color: 
     }
 }
 
-@Composable
-private fun AlmacenRow(label: String, value: String, color: Color) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 14.sp, color = Color(0xFF1E293B), modifier = Modifier.weight(1f))
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
-    }
-}
-
 private fun estadoColor(estado: String): Color = when (estado) {
     "REGISTRADO"           -> Color(0xFF3B82F6)
     "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B)
-    "EN_ESTANTE"           -> Color(0xFF10B981)
-    "SALIDA_DE_ESTANTE"    -> Color(0xFF8B5CF6)
     "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899)
-    "ENTREGADO"            -> Color(0xFF64748B)
     else                   -> Color.Gray
 }
