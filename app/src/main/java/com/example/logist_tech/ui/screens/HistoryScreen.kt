@@ -32,9 +32,6 @@ fun GlobalHistoryScreen(
         viewModel.loadHistorialGlobal()
     }
 
-    // Mostrar todos los movimientos sin filtro
-    val historialFiltrado = viewModel.historialGlobal
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -56,7 +53,7 @@ fun GlobalHistoryScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (historialFiltrado.isEmpty()) {
+            if (viewModel.historialGlobal.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier.fillParentMaxSize(),
@@ -66,7 +63,11 @@ fun GlobalHistoryScreen(
                     }
                 }
             }
-            items(historialFiltrado) { mov ->
+            // key estable evita recomposición innecesaria al hacer scroll
+            items(
+                items = viewModel.historialGlobal,
+                key = { it.id }
+            ) { mov ->
                 TimelineItem(mov)
             }
         }
@@ -78,10 +79,7 @@ fun TimelineItem(mov: HistorialMovimiento) {
     val (stateColor, label) = when (mov.estado_nuevo) {
         "REGISTRADO"           -> Color(0xFF1976D2) to "ENTRADA"
         "RECEPCION_EN_ALMACEN" -> Color(0xFFF59E0B) to "EN ALMACÉN"
-        "EN_ESTANTE"           -> Color(0xFF10B981) to "EN ESTANTE"
-        "SALIDA_DE_ESTANTE"    -> Color(0xFF8B5CF6) to "SALIDA ESTANTE"
-        "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899) to "SALIENDO"
-        "ENTREGADO"            -> Color(0xFF64748B) to "ENTREGADO"
+        "SALIENDO_DE_ALMACEN"  -> Color(0xFFEC4899) to "SALIDA"
         else                   -> Color.Gray to mov.estado_nuevo
     }
 
@@ -143,7 +141,7 @@ fun TimelineItem(mov: HistorialMovimiento) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "${mov.id_operator} • ${mov.tipo_operador}",
+                        text = "${mov.id_operador} • ${mov.tipo_operador}",
                         fontSize = 13.sp,
                         color = Color.DarkGray
                     )
