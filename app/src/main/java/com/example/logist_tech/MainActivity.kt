@@ -131,8 +131,7 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         ocr.isNotBlank() -> {
-                                            val qrData = com.example.logist_tech.ocr.OcrProcessor.parsearQr(ocr)
-                                            val idCaja = qrData?.idCaja ?: ""
+                                            val idCaja = com.example.logist_tech.ocr.OcrProcessor.extraerIdDeTexto(ocr)
 
                                             if (idCaja.isNotBlank()) {
                                                 val encodedId = Uri.encode(idCaja)
@@ -141,6 +140,8 @@ class MainActivity : ComponentActivity() {
                                                 else
                                                     "gestion_caja/$encodedId"
                                                 navController.navigate(destino)
+                                            } else if (SessionManager.rol == SessionManager.Rol.RECEPTOR) {
+                                                navController.navigate("registro_caja/${Uri.encode(ocr)}")
                                             } else {
                                                 navController.navigate("ocr_result")
                                             }
